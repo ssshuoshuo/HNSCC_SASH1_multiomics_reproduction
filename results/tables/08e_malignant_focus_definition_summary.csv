@@ -1,0 +1,4 @@
+"focus_definition","included_clusters","cell_number","percent_of_all_cells"
+"Core_Malignant_Focused","6, 11",3521,7.81
+"Extended_Malignant_Focused","4, 6, 11",7053,15.64
+"All_tumor_related_states","2, 3, 4, 6, 11",15627,34.66

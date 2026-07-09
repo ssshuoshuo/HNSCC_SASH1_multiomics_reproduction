@@ -1,0 +1,17 @@
+"paper_cluster_res_0_2","paper_major_cell_type","paper_malignant_focus","cell_number","percent_of_all_cells"
+"0","Cytotoxic_T_NKT","Background",12299,27.28
+"1","Macrophage","Background",5093,11.3
+"2","Differentiated_Tumor","Malignant_Focused",4723,10.48
+"3","Cycling_Tumor","Malignant_Focused",3851,8.54
+"4","CT_Antigen_Tumor","Malignant_Focused",3532,7.83
+"5","Treg","Background",3280,7.28
+"6","Tumor_Epithelial","Malignant_Focused",2617,5.8
+"7","Fibroblast_CAF","Background",2249,4.99
+"8","B_Cell","Background",1667,3.7
+"9","Plasma_Cell","Background",1600,3.55
+"10","Blood_Endothelial","Background",1589,3.52
+"11","Tumor_Epithelial","Malignant_Focused",904,2.01
+"12","Mast_Cell","Background",798,1.77
+"13","pDC","Background",687,1.52
+"14","Lymphatic_Endothelial","Background",134,0.3
+"15","Salivary_Epithelial","Background",61,0.14

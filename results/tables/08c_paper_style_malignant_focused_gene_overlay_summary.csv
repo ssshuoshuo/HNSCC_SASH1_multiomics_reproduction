@@ -1,0 +1,13 @@
+"expression_class","cell_number","gene","percent_of_malignant_focused","high_cutoff_log_normalized_expression","detected_malignant_cell_number","detected_percent_of_malignant_focused"
+"Background",0,"SASH1",0,0.223046420783788,759,4.86
+"Low",15437,"SASH1",98.78,0.223046420783788,759,4.86
+"High",190,"SASH1",1.22,0.223046420783788,759,4.86
+"Background",0,"MYH11",0,0.173176821130263,189,1.21
+"Low",15579,"MYH11",99.69,0.173176821130263,189,1.21
+"High",48,"MYH11",0.31,0.173176821130263,189,1.21
+"Background",0,"EMP1",0,0.443476242521173,2808,17.97
+"Low",14925,"EMP1",95.51,0.443476242521173,2808,17.97
+"High",702,"EMP1",4.49,0.443476242521173,2808,17.97
+"Background",0,"COL1A1",0,1.32357812616355,2564,16.41
+"Low",14986,"COL1A1",95.9,1.32357812616355,2564,16.41
+"High",641,"COL1A1",4.1,1.32357812616355,2564,16.41

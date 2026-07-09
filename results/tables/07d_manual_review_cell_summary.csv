@@ -1,0 +1,13 @@
+"internal_cluster_07c","manual_review_status","cell_number","review_decision","rationale","percent_of_all_07c_cells"
+"0","Retain_epithelial_core",1046,"Retain_epithelial_core","Cancer-testis antigen-like epithelial program.",20.52
+"1","Retain_epithelial_core",903,"Retain_epithelial_core","Epithelial malignant state retained for downstream comparison.",17.71
+"2","Retain_epithelial_core",852,"Retain_epithelial_core","Interferon/chemokine-like epithelial state retained.",16.71
+"3","Retain_epithelial_core",558,"Retain_epithelial_core","Squamous differentiation/keratinization-like epithelial state retained.",10.95
+"4","Retain_epithelial_core",496,"Retain_epithelial_core","Epithelial malignant state retained for downstream comparison.",9.73
+"5","Retain_epithelial_core",375,"Retain_epithelial_core","Differentiated or secretory-like epithelial state retained.",7.36
+"6","Exclude_lineage_ambiguous",350,"Exclude_lineage_ambiguous","Mixed/lineage-ambiguous immune-associated signal.",6.87
+"7","Retain_epithelial_core",172,"Retain_epithelial_core","Differentiated or secretory-like epithelial state retained.",3.37
+"8","Exclude_stromal_or_myeloid_like",160,"Exclude_stromal_or_myeloid_like","Stromal or myeloid-associated marker signal.",3.14
+"9","Exclude_CAF_stromal_like",89,"Exclude_CAF_stromal_like","CAF/stromal-associated marker signal.",1.75
+"10","Exclude_T_cell_like",66,"Exclude_T_cell_like","T-cell-associated marker signal.",1.29
+"11","Exclude_macrophage_like",31,"Exclude_macrophage_like","Macrophage-associated marker signal.",0.61

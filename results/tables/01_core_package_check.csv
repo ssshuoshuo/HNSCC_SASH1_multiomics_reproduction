@@ -1,0 +1,16 @@
+"package","installed"
+"Seurat",TRUE
+"SeuratObject",TRUE
+"harmony",TRUE
+"Matrix",TRUE
+"data.table",TRUE
+"dplyr",TRUE
+"tidyr",TRUE
+"stringr",TRUE
+"fs",TRUE
+"ggplot2",TRUE
+"patchwork",TRUE
+"cowplot",TRUE
+"future",TRUE
+"R.utils",TRUE
+"curl",TRUE

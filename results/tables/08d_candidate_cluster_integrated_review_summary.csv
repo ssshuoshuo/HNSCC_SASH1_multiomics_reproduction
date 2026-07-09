@@ -1,0 +1,6 @@
+"paper_cluster_res_0_2","candidate_cluster","cell_number","percent_of_candidate_cells","total_cell_number","strict_copykat_cell_number","strict_copykat_percent","copykat_missing_cell_number","sample_number_with_cells","sample_number_with_at_least_5_percent","dominant_sample_percent","vertex_bin_number_present","dominant_vertex_bin_percent"
+"11","11_Tumor_Epithelial",904,5.78,904,896,99.12,0,2,1,99.67,5,92.7
+"6","6_Tumor_Epithelial",2617,16.75,2617,2137,81.66,0,12,6,43.33,9,21.59
+"4","4_CT_Antigen_Tumor",3532,22.6,3532,1047,29.64,0,12,1,97.9,9,48.67
+"2","2_Differentiated_Tumor",4723,30.22,4723,630,13.34,0,12,6,38.22,9,42.9
+"3","3_Cycling_Tumor",3851,24.64,3851,390,10.13,0,12,6,37.08,9,38.17

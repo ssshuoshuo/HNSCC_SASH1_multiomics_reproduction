@@ -1,0 +1,13 @@
+"sample_id","total_epithelial_core_cells","internal_cluster_number","program_number","internal_clusters_with_at_least_20_cells","largest_cluster_fraction","eligible_for_within_sample_trajectory"
+"scB8",1145,6,4,3,62.36,TRUE
+"scB1",1457,3,3,2,62.11,FALSE
+"scB9",935,4,2,1,99.14,FALSE
+"scB7",292,4,3,1,96.58,FALSE
+"scB5",214,4,3,1,92.52,FALSE
+"scB2",172,2,2,1,97.09,FALSE
+"scB13",135,2,2,1,93.33,FALSE
+"scB14",35,4,3,1,85.71,FALSE
+"scB12",7,3,3,0,71.43,FALSE
+"scB15",5,1,1,0,100,FALSE
+"OSCC",4,3,2,0,50,FALSE
+"scB10",1,1,1,0,100,FALSE

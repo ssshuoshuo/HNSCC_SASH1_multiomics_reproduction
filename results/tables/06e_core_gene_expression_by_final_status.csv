@@ -1,0 +1,13 @@
+"core_gene_comparison_group","gene","cell_number","percent_expressed","mean_expression","median_expression"
+"Strict_malignant","COL1A1",5100,29.78,0.167493410079139,0
+"Strict_malignant","EMP1",5100,44.61,0.283353600977661,0
+"Strict_malignant","MYH11",5100,3.22,0.0117802655890509,0
+"Strict_malignant","SASH1",5100,12.33,0.0487234341180837,0
+"Candidate_not_confirmed","COL1A1",10527,9.93,0.235001415373423,0
+"Candidate_not_confirmed","EMP1",10527,5.06,0.0982429906216754,0
+"Candidate_not_confirmed","MYH11",10527,0.24,0.00483971752174738,0
+"Candidate_not_confirmed","SASH1",10527,1.23,0.0194651267395523,0
+"Salivary_reference","COL1A1",61,8.2,0.133333032256132,0
+"Salivary_reference","EMP1",61,14.75,0.140292004045199,0
+"Salivary_reference","MYH11",61,0,0,0
+"Salivary_reference","SASH1",61,18.03,0.173187648499451,0

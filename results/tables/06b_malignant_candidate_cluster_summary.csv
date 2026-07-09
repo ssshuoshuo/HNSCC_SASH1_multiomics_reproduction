@@ -1,0 +1,17 @@
+"malignant_status_diagnostic","cluster","celltype_manual","cell_number","percent_within_status"
+"Tumor_epithelial_candidate","2","Differentiated_epithelial_tumor_candidate",4723,10.48
+"Tumor_epithelial_candidate","3","Cycling_epithelial_tumor_candidate",3851,8.54
+"Tumor_epithelial_candidate","4","Cancer_testis_epithelial_tumor_candidate",3532,7.83
+"Tumor_epithelial_candidate","6","Epithelial_tumor_candidate",2617,5.8
+"Tumor_epithelial_candidate","11","Epithelial_tumor_candidate",904,2.01
+"Salivary_epithelial_reference","15","Salivary_epithelial_normal_like",61,0.14
+"Other_cells","0","Cytotoxic_T_NKT",12299,27.28
+"Other_cells","1","Macrophage",5093,11.3
+"Other_cells","5","Treg",3280,7.28
+"Other_cells","7","Fibroblast_CAF",2249,4.99
+"Other_cells","8","B_cell",1667,3.7
+"Other_cells","9","Plasma_cell",1600,3.55
+"Other_cells","10","Blood_endothelial",1589,3.52
+"Other_cells","12","Mast_cell",798,1.77
+"Other_cells","13","Plasmacytoid_DC",687,1.52
+"Other_cells","14","Lymphatic_endothelial",134,0.3

@@ -1,0 +1,13 @@
+"malignant_status_diagnostic","gene","cell_number","percent_expressed","mean_expression","median_expression"
+"Tumor_epithelial_candidate","COL1A1",15627,16.41,0.212969622514865,0
+"Tumor_epithelial_candidate","EMP1",15627,17.97,0.158655361058454,0
+"Tumor_epithelial_candidate","MYH11",15627,1.21,0.00710482247748131,0
+"Tumor_epithelial_candidate","SASH1",15627,4.86,0.0290138160356763,0
+"Salivary_epithelial_reference","COL1A1",61,8.2,0.133333032256132,0
+"Salivary_epithelial_reference","EMP1",61,14.75,0.140292004045199,0
+"Salivary_epithelial_reference","MYH11",61,0,0,0
+"Salivary_epithelial_reference","SASH1",61,18.03,0.173187648499451,0
+"Other_cells","COL1A1",29396,11.72,0.344322445590189,0
+"Other_cells","EMP1",29396,13.07,0.20917345472337,0
+"Other_cells","MYH11",29396,3.58,0.0529032716230948,0
+"Other_cells","SASH1",29396,8.12,0.0843829196768928,0

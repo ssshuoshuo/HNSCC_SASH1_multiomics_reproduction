@@ -1,0 +1,6 @@
+"cluster","celltype_manual","total_candidate_cells","aneuploid_cells","aneuploid_percent"
+"2","Differentiated_epithelial_tumor_candidate",4723,630,13.34
+"3","Cycling_epithelial_tumor_candidate",3851,390,10.13
+"4","Cancer_testis_epithelial_tumor_candidate",3532,1047,29.64
+"6","Epithelial_tumor_candidate",2617,2137,81.66
+"11","Epithelial_tumor_candidate",904,896,99.12

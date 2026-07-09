@@ -1,0 +1,2 @@
+"analysis_preset","min_nFeature","max_nFeature","min_nCount","max_nCount","max_percent_mt"
+"reproduction_candidate",200,8000,500,1e+05,20
