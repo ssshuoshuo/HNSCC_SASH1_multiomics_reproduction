@@ -1,0 +1,15 @@
+.DS_Store
+.Rhistory
+.RData
+.RDataTmp
+.Rproj.user/
+*.log
+*.out
+*.err
+__pycache__/
+
+# local-only script archives and cleaning utilities
+tools/
+scripts_comment_backup/
+scripts_all_local/
+README/
