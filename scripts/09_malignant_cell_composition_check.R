@@ -1,30 +1,43 @@
-# ============================================================
-# 06f_malignant_cell_composition_check.R
+# 09_malignant_cell_composition_check.R
+
+# 本脚本功能：
+# 1. 读取08 final malignant call对象
+# 2. 提取Strict_malignant_CopyKAT_aneuploid细胞
+# 3. 统计strict malignant细胞的sample组成
+# 4. 统计strict malignant细胞的cluster组成
+# 5. 检查是否存在明显sample或cluster主导
+# 6. 输出sample、cluster和sample×cluster组成图
+# 7. 为后续trajectory分析制定主分析和敏感性分析策略
+# 8. 保存strict malignant细胞metadata和session信息
+
+# 本项目专用数据：
+# GSE215403
+# 12个OSCC单细胞样本：
+# OSCC, scB1, scB2, scB5, scB7, scB8,
+# scB9, scB10, scB12, scB13, scB14, scB15
 #
-# 功能：
-# 1. 统计Strict_malignant_CopyKAT_aneuploid细胞的sample组成
-# 2. 统计其cluster组成
-# 3. 检查是否存在明显sample / cluster主导
-# 4. 为后续Monocle3拟时序决定主分析与敏感性分析策略
+# 本脚本关注08中定义的严格恶性细胞：
+# Strict_malignant_CopyKAT_aneuploid
 #
-# ============================================================
+# 该步骤用于判断后续trajectory分析是否可能被单一样本
+# 或单一cluster主导。
+#
+# 通用代码修改位置：
+# 1. 换数据集时：
+#    修改input_object_file、cluster_column和status_column
+#
+# 2. 换final malignant标签时：
+#    修改strict_label
+#
+# 3. 换candidate cluster范围时：
+#    修改all_clusters
+#
+# 4. 调整sample-level分析门槛时：
+#    修改minimum_cells_for_sample_level_analysis
+
 
 # ============================================================
-# 用户配置说明
-# ============================================================
-# 运行前请检查以下设置：
-# 1. project_dir：项目根目录。
-# 2. raw_dir：原始数据目录。
-# 3. object_dir：RDS对象输出目录。
-# 4. table_dir：CSV和TXT结果输出目录。
-# 5. figure_dir：PDF图输出目录。
-# 6. 输入文件名：若本地文件名不同，请在对应input_file处修改。
-# 7. 线程数、内存和运行位置：CopyKAT、Seurat聚类和Monocle3建议在服务器或高内存本地环境运行。
-# ============================================================
-
-
-# ============================================================
-# A. R library与包
+# A. 加载包
 # ============================================================
 
 options(timeout = 3600)
@@ -83,7 +96,7 @@ library(ggplot2)
 library(scales)
 
 # ============================================================
-# B. 路径
+# B. 项目路径与文件夹
 # ============================================================
 
 project_dir <- getwd()
@@ -111,20 +124,21 @@ dir.create(table_dir, recursive = TRUE, showWarnings = FALSE)
 dir.create(figure_dir, recursive = TRUE, showWarnings = FALSE)
 
 # ============================================================
-# C. 读取06e最终对象
+# C. 读取08最终对象
 # ============================================================
 
 input_object_file <- file.path(
   object_dir,
-  "06e_GSE215403_final_malignant_call.rds"
+  "08_final_malignant_call.rds"
 )
 
 if (!file.exists(input_object_file)) {
   
   stop(
     paste0(
-      "找不到06e对象：\n",
-      input_object_file
+      "找不到08对象：\n",
+      input_object_file,
+      "\n请先运行08_finalize_malignant_call.R"
     )
   )
 }
@@ -158,7 +172,7 @@ if (length(missing_metadata) > 0) {
 }
 
 # ============================================================
-# D. 提取严格malignant细胞metadata
+# D. 提取strict malignant细胞metadata
 # ============================================================
 
 strict_label <- "Strict_malignant_CopyKAT_aneuploid"
@@ -216,7 +230,7 @@ write.csv(
   strict_by_sample,
   file.path(
     table_dir,
-    "06f_strict_malignant_cells_by_sample.csv"
+    "09_strict_malignant_cells_by_sample.csv"
   ),
   row.names = FALSE
 )
@@ -246,13 +260,13 @@ write.csv(
   strict_by_cluster,
   file.path(
     table_dir,
-    "06f_strict_malignant_cells_by_cluster.csv"
+    "09_strict_malignant_cells_by_cluster.csv"
   ),
   row.names = FALSE
 )
 
 # ============================================================
-# G. Sample × cluster组成
+# G. Sample×cluster组成
 # ============================================================
 
 strict_by_sample_cluster <- strict_meta %>%
@@ -282,13 +296,13 @@ write.csv(
   strict_by_sample_cluster,
   file.path(
     table_dir,
-    "06f_strict_malignant_cells_by_sample_cluster.csv"
+    "09_strict_malignant_cells_by_sample_cluster.csv"
   ),
   row.names = FALSE
 )
 
 # ============================================================
-# H. 每个sample的肿瘤细胞量与总体比例
+# H. 每个sample的strict malignant细胞量与总体比例
 # ============================================================
 
 sample_total_summary <- sc@meta.data %>%
@@ -324,17 +338,17 @@ write.csv(
   sample_total_summary,
   file.path(
     table_dir,
-    "06f_strict_malignant_cells_per_sample_summary.csv"
+    "09_strict_malignant_cells_per_sample_summary.csv"
   ),
   row.names = FALSE
 )
 
 # ============================================================
-# I. 拟时序候选sample建议
+# I. Trajectory候选sample建议
 # ============================================================
-#
-# 后续拟时序优先使用strict malignant cell数>=100的sample。
-# ============================================================
+
+# 后续sample-aware trajectory或敏感性分析优先考虑
+# strict malignant cell数>=100的sample。
 
 minimum_cells_for_sample_level_analysis <- 100
 
@@ -349,13 +363,13 @@ write.csv(
   pseudotime_sample_recommendation,
   file.path(
     table_dir,
-    "06f_pseudotime_sample_recommendation.csv"
+    "09_pseudotime_sample_recommendation.csv"
   ),
   row.names = FALSE
 )
 
 # ============================================================
-# J. 图1：严格malignant细胞按sample组成
+# J. 图1：strict malignant细胞按sample组成
 # ============================================================
 
 p_sample_composition <- ggplot(
@@ -404,7 +418,7 @@ p_sample_composition <- ggplot(
 ggsave(
   filename = file.path(
     figure_dir,
-    "06f_strict_malignant_cell_composition_by_sample.pdf"
+    "09_strict_malignant_cell_composition_by_sample.pdf"
   ),
   plot = p_sample_composition,
   width = 10,
@@ -412,7 +426,7 @@ ggsave(
 )
 
 # ============================================================
-# K. 图2：严格malignant细胞按cluster组成
+# K. 图2：strict malignant细胞按cluster组成
 # ============================================================
 
 p_cluster_composition <- ggplot(
@@ -460,7 +474,7 @@ p_cluster_composition <- ggplot(
 ggsave(
   filename = file.path(
     figure_dir,
-    "06f_strict_malignant_cell_composition_by_cluster.pdf"
+    "09_strict_malignant_cell_composition_by_cluster.pdf"
   ),
   plot = p_cluster_composition,
   width = 10,
@@ -468,7 +482,7 @@ ggsave(
 )
 
 # ============================================================
-# L. 图3：sample × cluster热图
+# L. 图3：sample×cluster热图
 # ============================================================
 
 all_samples <- sort(
@@ -561,7 +575,7 @@ p_sample_cluster_heatmap <- ggplot(
 ggsave(
   filename = file.path(
     figure_dir,
-    "06f_strict_malignant_cells_by_sample_cluster.pdf"
+    "09_strict_malignant_cells_by_sample_cluster.pdf"
   ),
   plot = p_sample_cluster_heatmap,
   width = 10,
@@ -569,14 +583,14 @@ ggsave(
 )
 
 # ============================================================
-# M. 保存轻量metadata对象
+# M. 保存轻量metadata对象和环境信息
 # ============================================================
 
 saveRDS(
   strict_meta,
   file.path(
     object_dir,
-    "06f_strict_malignant_cell_metadata.rds"
+    "09_strict_malignant_cell_metadata.rds"
   )
 )
 
@@ -584,22 +598,25 @@ writeLines(
   capture.output(sessionInfo()),
   con = file.path(
     table_dir,
-    "06f_sessionInfo.txt"
+    "09_sessionInfo.txt"
   )
 )
 
 # ============================================================
-# N. 完成提示
+# N. 最终提示
 # ============================================================
 
 message("\n============================================================")
-message("06f_malignant_cell_composition_check.R运行完成。")
+message("09_malignant_cell_composition_check.R运行完成。")
 message("")
-message("重点查看：")
-message("1. results/figures/06f_strict_malignant_cell_composition_by_sample.pdf")
-message("2. results/figures/06f_strict_malignant_cell_composition_by_cluster.pdf")
-message("3. results/figures/06f_strict_malignant_cells_by_sample_cluster.pdf")
-message("4. results/tables/06f_strict_malignant_cells_per_sample_summary.csv")
-message("5. results/tables/06f_strict_malignant_cells_by_sample_cluster.csv")
-message("6. results/tables/06f_pseudotime_sample_recommendation.csv")
+message("已保存对象：")
+message("results/objects/09_strict_malignant_cell_metadata.rds")
+message("")
+message("请重点查看：")
+message("1. results/figures/09_strict_malignant_cell_composition_by_sample.pdf")
+message("2. results/figures/09_strict_malignant_cell_composition_by_cluster.pdf")
+message("3. results/figures/09_strict_malignant_cells_by_sample_cluster.pdf")
+message("4. results/tables/09_strict_malignant_cells_per_sample_summary.csv")
+message("5. results/tables/09_strict_malignant_cells_by_sample_cluster.csv")
+message("6. results/tables/09_pseudotime_sample_recommendation.csv")
 message("============================================================\n")

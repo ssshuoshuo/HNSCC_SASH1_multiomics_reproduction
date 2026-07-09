@@ -101,7 +101,7 @@ monocle3 >= 1.3.1
 * 服务器优先；
 * 高内存本地电脑也可运行。
 
-### 03b_GSE215403_QC_reproduction_candidate.R
+### 03_QC_reproduction_candidate.R
 
 功能：
 
@@ -116,7 +116,7 @@ monocle3 >= 1.3.1
 * 服务器优先；
 * 本地高内存环境可运行。
 
-### 04b_GSE215403_standard_Seurat_multi_resolution.R
+### 04_standard_Seurat_multi_resolution.R
 
 功能：
 
@@ -137,7 +137,7 @@ monocle3 >= 1.3.1
 
 * 服务器优先。
 
-### 05c_GSE215403_major_cell_type_annotation.R
+### 05_major_cell_type_annotation.R
 
 功能：
 
@@ -168,7 +168,7 @@ Salivary_Epithelial
 
 * 本地可运行。
 
-### 06b_GSE215403_tumor_related_epithelial_candidates.R
+### 06_tumor_related_epithelial_candidates.R
 
 功能：
 
@@ -190,11 +190,11 @@ cluster 11：Tumor_Epithelial
 
 * 本地可运行。
 
-### 06d_GSE215403_CopyKAT_per_sample.R
+### 07_CopyKAT_per_sample.R
 
 配套脚本：
 
-06d_GSE215403_CopyKAT_per_sample_batch.sh
+07_CopyKAT_per_sample_batch.sh
 
 功能：
 
@@ -207,11 +207,11 @@ cluster 11：Tumor_Epithelial
 
 * 服务器优先。
 
-### 06e_GSE215403_final_malignant_call.R
+### 08_final_malignant_call.R
 
 配套脚本：
 
-06e_GSE215403_final_malignant_call_batch.sh
+08_final_malignant_call_batch.sh
 
 功能：
 
@@ -228,11 +228,11 @@ tumor-related epithelial candidate + CopyKAT aneuploid
 
 * 本地可运行。
 
-### 06f_GSE215403_strict_malignant_composition.R
+### 09_strict_malignant_composition.R
 
 配套脚本：
 
-06f_GSE215403_strict_malignant_composition_batch.sh
+09_strict_malignant_composition_batch.sh
 
 功能：
 
@@ -244,7 +244,7 @@ tumor-related epithelial candidate + CopyKAT aneuploid
 
 * 本地可运行。
 
-### 07d_GSE215403_manual_review_epithelial_core.R
+### 10_manual_review_epithelial_core.R
 
 功能：
 
@@ -258,7 +258,7 @@ tumor-related epithelial candidate + CopyKAT aneuploid
 
 * 本地可运行。
 
-### 08d_GSE215403_malignant_focus_cluster_audit.R
+### 11a_malignant_focus_cluster_audit.R
 
 功能：
 
@@ -281,7 +281,7 @@ Extended_Malignant_Focused = cluster 4 + cluster 6 + cluster 11
 
 * 本地可运行。
 
-### 08e_GSE215403_core_malignant_global_trajectory.R
+### 11b_core_malignant_global_trajectory.R
 
 功能：
 
@@ -305,7 +305,7 @@ Extended_Malignant_Focused = cluster 4 + cluster 6 + cluster 11
 * 服务器优先；
 * 高内存本地电脑可运行。
 
-### 09a_GSE252265_spatial_download_QC_gene_maps.R
+### 12_spatial_download_QC_gene_maps.R
 
 功能：
 
@@ -335,29 +335,29 @@ Extended_Malignant_Focused = cluster 4 + cluster 6 + cluster 11
 
 ### 5.1 单细胞主要图
 
-results/figures/05c_major_cell_populations_UMAP_final.pdf
-results/figures/06b_tumor_candidate_and_salivary_reference_UMAP.pdf
-results/figures/06e_final_malignant_call_UMAP.pdf
-results/figures/08e_core_vs_extended_malignant_focus_comparison.pdf
-results/figures/08e_core_malignant_focused_gene_overlays.pdf
-results/figures/08e_extended_malignant_focused_gene_overlays.pdf
+results/figures/05_major_cell_populations_UMAP_final.pdf
+results/figures/06_tumor_candidate_and_salivary_reference_UMAP.pdf
+results/figures/08_final_malignant_call_UMAP.pdf
+results/figures/11b_core_vs_extended_malignant_focus_comparison.pdf
+results/figures/11b_core_malignant_focused_gene_overlays.pdf
+results/figures/11b_extended_malignant_focused_gene_overlays.pdf
 
 ### 5.2 单细胞主要表格
 
-results/tables/06e_CopyKAT_status_summary.csv
-results/tables/06f_malignant_cell_composition_summary.csv
-results/tables/07d_manual_review_cluster_decision.csv
-results/tables/08d_candidate_cluster_integrated_review_summary.csv
-results/tables/08e_malignant_focus_definition_summary.csv
-results/tables/08e_core_extended_gene_overlay_summary.csv
+results/tables/08_CopyKAT_status_summary.csv
+results/tables/09_malignant_cell_composition_summary.csv
+results/tables/10_manual_review_cluster_decision.csv
+results/tables/11a_candidate_cluster_integrated_review_summary.csv
+results/tables/11b_malignant_focus_definition_summary.csv
+results/tables/11b_core_extended_gene_overlay_summary.csv
 
 ### 5.3 空间转录组主要结果
 
-results/figures/09a_spatial_QC_UMI_distribution.pdf
-results/figures/09a_spatial_QC_detected_gene_distribution.pdf
-results/figures/09a_SASH1_COL1A1_EMP1_MYH11_spatial_expression.pdf
-results/tables/09a_spatial_spot_QC_summary.csv
-results/tables/09a_SASH1_COL1A1_spot_detection_summary.csv
+results/figures/12_spatial_QC_UMI_distribution.pdf
+results/figures/12_spatial_QC_detected_gene_distribution.pdf
+results/figures/12_SASH1_COL1A1_EMP1_MYH11_spatial_expression.pdf
+results/tables/12_spatial_spot_QC_summary.csv
+results/tables/12_SASH1_COL1A1_spot_detection_summary.csv
 
 ## 6. 最终分析逻辑
 

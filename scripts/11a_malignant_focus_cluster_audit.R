@@ -1,45 +1,46 @@
-# ============================================================
-# 08d_paper_malignant_focus_cluster_audit_local.R
+# 11a_malignant_focus_cluster_audit.R
+
+# 本脚本功能：
+# 1. 审查当前用于Malignant_Focused的五个候选cluster：2、3、4、6、11
+# 2. 整合04标准Seurat对象、08 final malignant call对象和trajectory metadata
+# 3. 汇总候选cluster的细胞数、样本组成、CopyKAT支持比例和vertex-bin分布
+# 4. 输出候选cluster UMAP、CopyKAT支持比例图、样本组成热图和marker DotPlot
+# 5. 输出综合审查表，用于人工判断哪些cluster更接近论文中的Malignant_Cells核心区域
+# 6. 本步骤不自动删除任何cluster，也不自动重定义恶性细胞
+# 7. 记录本步骤session信息
+
+# 本项目专用数据：
+# GSE215403
+# 12个OSCC单细胞样本：
+# OSCC, scB1, scB2, scB5, scB7, scB8,
+# scB9, scB10, scB12, scB13, scB14, scB15
 #
-# 目的：
-# 1. 审查当前用于Malignant_Focused的五个候选cluster：
-#    2 / 3 / 4 / 6 / 11；
-# 3. 整合04b、06e、08c已有结果；
-# 4. 从多个角度判断哪些cluster更接近论文中的
-#    Malignant_Cells / Malignant_Focused核心区域；
-# 5. 输出用于人工决策的图和表；
-# 6. 本步骤不自动删除任何cluster，也不自动重定义恶性细胞。
+# 本脚本关注五个tumor-related epithelial candidate clusters：
+# 2=Differentiated_Tumor
+# 3=Cycling_Tumor
+# 4=CT_Antigen_Tumor
+# 6=Tumor_Epithelial
+# 11=Tumor_Epithelial
 #
-# 输入：
-# - 04b_GSE215403_standard_Seurat_multi_resolution.rds
-# - 06e_GSE215403_final_malignant_call.rds
-# - 08c_global_trajectory_cell_metadata_with_vertex_bins.csv
+# 本步骤是人工审查步骤。
+# 它只输出辅助决策图表，不直接改变final malignant call。
 #
-# 输出：
-# - 候选cluster UMAP图
-# - 候选cluster样本组成
-# - CopyKAT支持比例
-# - marker DotPlot
-# - vertex-bin组成
-# - 综合审查表
-# ============================================================
+# 通用代码修改位置：
+# 1. 换数据集时：
+#    修改input_04_file、input_08_file和input_trajectory_metadata_file
+#
+# 2. 换cluster分辨率时：
+#    修改cluster_column
+#
+# 3. 换candidate cluster定义时：
+#    修改candidate_clusters和candidate_cluster_labels
+#
+# 4. 换marker审查基因时：
+#    修改marker_genes
+
 
 # ============================================================
-# 用户配置说明
-# ============================================================
-# 运行前请检查以下设置：
-# 1. project_dir：项目根目录。
-# 2. raw_dir：原始数据目录。
-# 3. object_dir：RDS对象输出目录。
-# 4. table_dir：CSV和TXT结果输出目录。
-# 5. figure_dir：PDF图输出目录。
-# 6. 输入文件名：若本地文件名不同，请在对应input_file处修改。
-# 7. 线程数、内存和运行位置：CopyKAT、Seurat聚类和Monocle3建议在服务器或高内存本地环境运行。
-# ============================================================
-
-
-# ============================================================
-# A. 包与路径
+# A. 加载包
 # ============================================================
 
 required_packages <- c(
@@ -81,6 +82,10 @@ library(ggplot2)
 library(patchwork)
 library(pheatmap)
 
+# ============================================================
+# B. 项目路径与文件夹
+# ============================================================
+
 project_dir <- normalizePath(
   "~/Desktop/HNSCC_SASH1_reproduction"
 )
@@ -116,127 +121,117 @@ dir.create(
 )
 
 # ============================================================
-# B. 自动定位输入文件
+# C. 设置输入文件
 # ============================================================
 
-find_single_file <- function(
-    directory,
-    pattern,
-    label
-) {
-  
-  matched_files <- list.files(
-    directory,
-    pattern = pattern,
-    full.names = TRUE,
-    ignore.case = TRUE
-  )
-  
-  if (length(matched_files) == 0) {
-    stop(
-      paste0(
-        "未找到",
-        label,
-        "。\n搜索目录：",
-        directory,
-        "\n搜索模式：",
-        pattern
-      )
-    )
-  }
-  
-  if (length(matched_files) > 1) {
-    message(
-      label,
-      "找到多个候选文件，默认使用第一个：\n",
-      matched_files[1]
-    )
-  }
-  
-  return(
-    matched_files[1]
-  )
-}
-
-input_04b_file <- find_single_file(
-  directory = object_dir,
-  pattern = "^04b_.*\\.rds$",
-  label = "04b Seurat对象"
+input_04_file <- file.path(
+  object_dir,
+  "04_standard_Seurat_multi_resolution.rds"
 )
 
-input_06e_file <- find_single_file(
-  directory = object_dir,
-  pattern = "^06e_.*\\.rds$",
-  label = "06e CopyKAT对象"
+input_08_file <- file.path(
+  object_dir,
+  "08_final_malignant_call.rds"
 )
 
-input_08c_metadata_file <- file.path(
+input_trajectory_metadata_file <- file.path(
   table_dir,
-  "08c_global_trajectory_cell_metadata_with_vertex_bins.csv"
+  "11_global_trajectory_cell_metadata_with_vertex_bins.csv"
 )
 
-if (!file.exists(input_08c_metadata_file)) {
+if (!file.exists(input_04_file)) {
   stop(
     paste0(
-      "未找到08c metadata文件：\n",
-      input_08c_metadata_file
+      "找不到04对象：\n",
+      input_04_file,
+      "\n请先确认04结果文件是否已完成重命名。"
+    )
+  )
+}
+
+if (!file.exists(input_08_file)) {
+  stop(
+    paste0(
+      "找不到08对象：\n",
+      input_08_file,
+      "\n请先确认08结果文件是否已完成重命名。"
+    )
+  )
+}
+
+if (!file.exists(input_trajectory_metadata_file)) {
+  stop(
+    paste0(
+      "找不到trajectory metadata文件：\n",
+      input_trajectory_metadata_file,
+      "\n请先确认原08c结果是否已重命名为11前缀。"
     )
   )
 }
 
 # ============================================================
-# C. 读取04b、06e与08c结果
+# D. 读取04、08与trajectory metadata
 # ============================================================
 
-sc_04b <- readRDS(
-  input_04b_file
+sc_04 <- readRDS(
+  input_04_file
 )
 
-sc_06e <- readRDS(
-  input_06e_file
+sc_08 <- readRDS(
+  input_08_file
 )
 
-DefaultAssay(sc_04b) <- "RNA"
-DefaultAssay(sc_06e) <- "RNA"
+DefaultAssay(sc_04) <- "RNA"
+DefaultAssay(sc_08) <- "RNA"
 
 trajectory_metadata <- read.csv(
-  input_08c_metadata_file,
+  input_trajectory_metadata_file,
   stringsAsFactors = FALSE,
   check.names = FALSE
 )
 
 message(
-  "04b细胞数：",
-  ncol(sc_04b)
+  "04细胞数：",
+  ncol(sc_04)
 )
 
 message(
-  "06e细胞数：",
-  ncol(sc_06e)
+  "08细胞数：",
+  ncol(sc_08)
 )
 
 message(
-  "08c metadata行数：",
+  "trajectory metadata行数：",
   nrow(trajectory_metadata)
 )
 
 # ============================================================
-# D. 恢复04b主cluster与候选恶性cluster
+# E. 恢复主cluster与候选恶性cluster标签
 # ============================================================
 
-cluster_column <- "RNA_snn_res.0.2"
+cluster_column <- "cluster_res_0.2"
 
-if (!cluster_column %in% colnames(sc_04b@meta.data)) {
-  stop(
-    paste0(
-      "04b中未找到主cluster列：",
-      cluster_column
+if (!cluster_column %in% colnames(sc_04@meta.data)) {
+  
+  alternative_cluster_column <- "RNA_snn_res.0.2"
+  
+  if (alternative_cluster_column %in% colnames(sc_04@meta.data)) {
+    
+    cluster_column <- alternative_cluster_column
+    
+  } else {
+    
+    stop(
+      paste0(
+        "04对象中未找到主cluster列。",
+        "\n已尝试：cluster_res_0.2和RNA_snn_res.0.2"
+      )
     )
-  )
+  }
 }
 
-sc_04b$paper_cluster_res_0_2 <- as.character(
-  sc_04b@meta.data[
+sc_04$paper_cluster_res_0_2 <- as.character(
+  sc_04@meta.data[
     ,
     cluster_column
   ]
@@ -258,17 +253,17 @@ candidate_cluster_labels <- c(
   "11" = "11_Tumor_Epithelial"
 )
 
-sc_04b$candidate_malignant_cluster <- ifelse(
-  sc_04b$paper_cluster_res_0_2 %in%
+sc_04$candidate_malignant_cluster <- ifelse(
+  sc_04$paper_cluster_res_0_2 %in%
     candidate_clusters,
   candidate_cluster_labels[
-    sc_04b$paper_cluster_res_0_2
+    sc_04$paper_cluster_res_0_2
   ],
   "Other_cells"
 )
 
-sc_04b$candidate_malignant_cluster <- factor(
-  sc_04b$candidate_malignant_cluster,
+sc_04$candidate_malignant_cluster <- factor(
+  sc_04$candidate_malignant_cluster,
   levels = c(
     "Other_cells",
     unname(
@@ -278,20 +273,19 @@ sc_04b$candidate_malignant_cluster <- factor(
 )
 
 # ============================================================
-# E. 自动识别06e中的CopyKAT严格恶性状态列
-# ============================================================
-#
-# 不假设06e内部metadata列名。
-# 自动搜索包含Strict_malignant_CopyKAT_aneuploid的列。
+# F. 自动识别08中的CopyKAT严格恶性状态列
 # ============================================================
 
-metadata_06e <- sc_06e@meta.data
+# 不强制假设metadata列名。
+# 自动搜索包含Strict_malignant_CopyKAT_aneuploid的列。
+
+metadata_08 <- sc_08@meta.data
 
 strict_status_column_candidates <- colnames(
-  metadata_06e
+  metadata_08
 )[
   vapply(
-    metadata_06e,
+    metadata_08,
     function(current_column) {
       
       any(
@@ -307,10 +301,8 @@ strict_status_column_candidates <- colnames(
 if (length(strict_status_column_candidates) == 0) {
   stop(
     paste0(
-      "06e中未找到包含Strict_malignant_CopyKAT_aneuploid的状态列。",
-      "\n请运行：",
-      "\nunique(unlist(lapply(sc_06e@meta.data, as.character)))",
-      "\n并把结果发回。"
+      "08对象中未找到包含Strict_malignant_CopyKAT_aneuploid的状态列。",
+      "\n请检查08对象metadata中的malignant_status_final等列。"
     )
   )
 }
@@ -320,26 +312,26 @@ strict_status_column <- strict_status_column_candidates[
 ]
 
 message(
-  "识别到06e严格恶性状态列：",
+  "识别到08严格恶性状态列：",
   strict_status_column
 )
 
 copykat_status <- as.character(
-  metadata_06e[
+  metadata_08[
     ,
     strict_status_column
   ]
 )
 
 names(copykat_status) <- rownames(
-  metadata_06e
+  metadata_08
 )
 
 # ============================================================
-# F. 建立统一cell-level审查表
+# G. 建立统一cell-level审查表
 # ============================================================
 
-audit_metadata <- sc_04b@meta.data
+audit_metadata <- sc_04@meta.data
 
 audit_metadata$cell_barcode <- rownames(
   audit_metadata
@@ -399,13 +391,13 @@ write.csv(
   audit_metadata,
   file.path(
     table_dir,
-    "08d_candidate_malignant_cluster_cell_metadata.csv"
+    "11a_candidate_malignant_cluster_cell_metadata.csv"
   ),
   row.names = FALSE
 )
 
 # ============================================================
-# G. 候选cluster基础组成与样本来源
+# H. 候选cluster基础组成与样本来源
 # ============================================================
 
 candidate_cell_metadata <- audit_metadata[
@@ -441,14 +433,14 @@ write.csv(
   cluster_size_summary,
   file.path(
     table_dir,
-    "08d_candidate_cluster_size_summary.csv"
+    "11a_candidate_cluster_size_summary.csv"
   ),
   row.names = FALSE
 )
 
 if (!"sample_id" %in% colnames(candidate_cell_metadata)) {
   stop(
-    "04b metadata中未找到sample_id列。"
+    "04对象metadata中未找到sample_id列。"
   )
 }
 
@@ -476,13 +468,13 @@ write.csv(
   candidate_sample_summary,
   file.path(
     table_dir,
-    "08d_candidate_cluster_sample_composition.csv"
+    "11a_candidate_cluster_sample_composition.csv"
   ),
   row.names = FALSE
 )
 
 # ============================================================
-# H. CopyKAT严格恶性支持比例
+# I. CopyKAT严格恶性支持比例
 # ============================================================
 
 copykat_support_summary <- candidate_cell_metadata %>%
@@ -521,13 +513,13 @@ write.csv(
   copykat_support_summary,
   file.path(
     table_dir,
-    "08d_candidate_cluster_CopyKAT_support_summary.csv"
+    "11a_candidate_cluster_CopyKAT_support_summary.csv"
   ),
   row.names = FALSE
 )
 
 # ============================================================
-# I. 08c vertex-bin分布
+# J. Trajectory vertex-bin分布
 # ============================================================
 
 vertex_bin_summary <- candidate_cell_metadata %>%
@@ -557,22 +549,13 @@ write.csv(
   vertex_bin_summary,
   file.path(
     table_dir,
-    "08d_candidate_cluster_vertex_bin_distribution.csv"
+    "11a_candidate_cluster_vertex_bin_distribution.csv"
   ),
   row.names = FALSE
 )
 
 # ============================================================
-# J. 图1：五个候选cluster的UMAP位置
-# ============================================================
-#
-# 优先使用04b对象中的UMAP。
-#
-# 若04b对象是精简版、未保存UMAP，
-# 则自动改用06e对象中的UMAP。
-#
-# 06e保留了全部细胞及CopyKAT结果，
-# 可用于展示候选cluster在原始全细胞空间的位置。
+# K. 图1：五个候选cluster的UMAP位置
 # ============================================================
 
 find_umap_reduction <- function(
@@ -630,56 +613,44 @@ find_umap_reduction <- function(
   return(NA_character_)
 }
 
-# ============================================================
-# 优先寻找04b对象UMAP
-# ============================================================
-
-plot_object <- sc_04b
+plot_object <- sc_04
 
 plot_reduction <- find_umap_reduction(
-  sc_04b
+  sc_04
 )
 
-plot_object_label <- "04b"
-
-# ============================================================
-# 若04b无UMAP，回退至06e对象
-# ============================================================
+plot_object_label <- "04"
 
 if (is.na(plot_reduction)) {
   
   message(
-    "04b对象未找到UMAP或其他二维降维，改用06e对象。"
+    "04对象未找到UMAP或其他二维降维，改用08对象。"
   )
   
-  plot_object <- sc_06e
+  plot_object <- sc_08
   
   plot_reduction <- find_umap_reduction(
-    sc_06e
+    sc_08
   )
   
-  plot_object_label <- "06e"
+  plot_object_label <- "08"
 }
-
-# ============================================================
-# 最终检查
-# ============================================================
 
 if (is.na(plot_reduction)) {
   
   stop(
     paste0(
-      "04b和06e对象中均未找到可用二维降维。",
+      "04和08对象中均未找到可用二维降维。",
       "\n\n",
-      "04b可用reductions：",
+      "04可用reductions：",
       paste(
-        names(sc_04b@reductions),
+        names(sc_04@reductions),
         collapse = ", "
       ),
       "\n",
-      "06e可用reductions：",
+      "08可用reductions：",
       paste(
-        names(sc_06e@reductions),
+        names(sc_08@reductions),
         collapse = ", "
       )
     )
@@ -696,11 +667,10 @@ message(
   plot_reduction
 )
 
-# ============================================================
-# 将08d候选cluster标签写入用于绘图的对象
-# ============================================================
+audit_metadata_for_plot <- audit_metadata
+rownames(audit_metadata_for_plot) <- audit_metadata_for_plot$cell_barcode
 
-plot_object$candidate_malignant_cluster <- audit_metadata[
+plot_object$candidate_malignant_cluster <- audit_metadata_for_plot[
   colnames(plot_object),
   "candidate_cluster"
 ]
@@ -724,10 +694,6 @@ plot_object$candidate_malignant_cluster <- factor(
     )
   )
 )
-
-# ============================================================
-# 绘制候选cluster UMAP
-# ============================================================
 
 p_candidate_cluster_umap <- DimPlot(
   plot_object,
@@ -757,7 +723,7 @@ p_candidate_cluster_umap <- DimPlot(
 ggsave(
   filename = file.path(
     figure_dir,
-    "08d_candidate_malignant_clusters_UMAP.pdf"
+    "11a_candidate_malignant_clusters_UMAP.pdf"
   ),
   plot = p_candidate_cluster_umap,
   width = 11,
@@ -765,7 +731,7 @@ ggsave(
 )
 
 # ============================================================
-# K. 图2：CopyKAT严格支持比例
+# L. 图2：CopyKAT严格支持比例
 # ============================================================
 
 p_copykat_support <- ggplot(
@@ -820,7 +786,7 @@ p_copykat_support <- ggplot(
 ggsave(
   filename = file.path(
     figure_dir,
-    "08d_candidate_cluster_CopyKAT_support.pdf"
+    "11a_candidate_cluster_CopyKAT_support.pdf"
   ),
   plot = p_copykat_support,
   width = 10,
@@ -828,7 +794,7 @@ ggsave(
 )
 
 # ============================================================
-# L. 图3：候选cluster样本组成热图
+# M. 图3：候选cluster样本组成热图
 # ============================================================
 
 sample_heatmap_matrix <- candidate_sample_summary %>%
@@ -861,14 +827,14 @@ pheatmap::pheatmap(
   main = "Sample Composition of Candidate Tumor-Related Clusters",
   filename = file.path(
     figure_dir,
-    "08d_candidate_cluster_sample_composition_heatmap.pdf"
+    "11a_candidate_cluster_sample_composition_heatmap.pdf"
   ),
   width = 11,
   height = 5
 )
 
 # ============================================================
-# M. 图4：候选cluster marker DotPlot
+# N. 图4：候选cluster marker DotPlot
 # ============================================================
 
 marker_genes <- c(
@@ -893,11 +859,11 @@ marker_genes <- c(
 
 marker_genes <- intersect(
   marker_genes,
-  rownames(sc_04b)
+  rownames(sc_04)
 )
 
 sc_marker_plot <- subset(
-  sc_04b,
+  sc_04,
   cells = candidate_cell_metadata$cell_barcode
 )
 
@@ -958,7 +924,7 @@ p_marker_dotplot <- DotPlot(
 ggsave(
   filename = file.path(
     figure_dir,
-    "08d_candidate_cluster_marker_DotPlot.pdf"
+    "11a_candidate_cluster_marker_DotPlot.pdf"
   ),
   plot = p_marker_dotplot,
   width = 15,
@@ -966,7 +932,7 @@ ggsave(
 )
 
 # ============================================================
-# N. 图5：候选cluster在08c vertex-bin中的分布
+# O. 图5：候选cluster在trajectory vertex-bin中的分布
 # ============================================================
 
 p_vertex_bin_distribution <- ggplot(
@@ -982,7 +948,7 @@ p_vertex_bin_distribution <- ggplot(
   ) +
   labs(
     title = "Vertex-bin Distribution of Candidate Tumor-Related Clusters",
-    x = "08c vertex bin",
+    x = "Trajectory vertex bin",
     y = "Cells within candidate cluster (%)",
     fill = "Candidate cluster"
   ) +
@@ -1001,7 +967,7 @@ p_vertex_bin_distribution <- ggplot(
 ggsave(
   filename = file.path(
     figure_dir,
-    "08d_candidate_cluster_vertex_bin_distribution.pdf"
+    "11a_candidate_cluster_vertex_bin_distribution.pdf"
   ),
   plot = p_vertex_bin_distribution,
   width = 13,
@@ -1009,7 +975,7 @@ ggsave(
 )
 
 # ============================================================
-# O. 综合审查表
+# P. 输出综合审查表
 # ============================================================
 
 sample_diversity_summary <- candidate_sample_summary %>%
@@ -1083,13 +1049,13 @@ write.csv(
   candidate_cluster_review_summary,
   file.path(
     table_dir,
-    "08d_candidate_cluster_integrated_review_summary.csv"
+    "11a_candidate_cluster_integrated_review_summary.csv"
   ),
   row.names = FALSE
 )
 
 # ============================================================
-# P. 保存运行信息
+# Q. 保存运行信息
 # ============================================================
 
 writeLines(
@@ -1098,26 +1064,26 @@ writeLines(
   ),
   con = file.path(
     table_dir,
-    "08d_sessionInfo.txt"
+    "11a_sessionInfo.txt"
   )
 )
 
 # ============================================================
-# Q. 完成提示
+# R. 最终提示
 # ============================================================
 
 message("\n============================================================")
-message("08d候选Malignant_Focused cluster审查完成。")
+message("11a_malignant_focus_cluster_audit.R运行完成。")
 message("")
-message("本步骤没有删除cluster，也没有重跑Monocle3。")
-message("请结合CopyKAT支持比例、marker表达、样本来源和UMAP位置，")
+message("本步骤没有删除cluster，也没有重跑trajectory。")
+message("请结合CopyKAT支持比例、marker表达、样本来源、vertex-bin分布和UMAP位置，")
 message("再决定论文式Malignant_Focused的最终cluster定义。")
 message("")
-message("重点查看：")
-message("1. 08d_candidate_malignant_clusters_04b_UMAP.pdf")
-message("2. 08d_candidate_cluster_CopyKAT_support.pdf")
-message("3. 08d_candidate_cluster_sample_composition_heatmap.pdf")
-message("4. 08d_candidate_cluster_marker_DotPlot.pdf")
-message("5. 08d_candidate_cluster_vertex_bin_distribution.pdf")
-message("6. 08d_candidate_cluster_integrated_review_summary.csv")
+message("请重点查看：")
+message("1. results/figures/11a_candidate_malignant_clusters_UMAP.pdf")
+message("2. results/figures/11a_candidate_cluster_CopyKAT_support.pdf")
+message("3. results/figures/11a_candidate_cluster_sample_composition_heatmap.pdf")
+message("4. results/figures/11a_candidate_cluster_marker_DotPlot.pdf")
+message("5. results/figures/11a_candidate_cluster_vertex_bin_distribution.pdf")
+message("6. results/tables/11a_candidate_cluster_integrated_review_summary.csv")
 message("============================================================\n")

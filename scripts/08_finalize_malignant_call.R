@@ -1,30 +1,44 @@
-# ============================================================
-# 06e_finalize_malignant_call.R
-#
-# 功能：
-# 1. 读取06d CopyKAT结果对象
+# 08_finalize_malignant_call.R
+
+# 本脚本功能：
+# 1. 读取07 CopyKAT结果对象
+# 2. 清理CopyKAT prediction标签
 # 3. 定义严格malignant epithelial cells
 # 4. 输出cluster和sample层面的aneuploid比例
-# 5. 输出SASH1等核心基因在最终分组中的描述性比较
-# 6. 保存后续Monocle3拟时序所需对象
-# ============================================================
+# 5. 输出SASH1、MYH11、EMP1、COL1A1在最终分组中的表达汇总
+# 6. 输出最终malignant status UMAP和核心基因表达图
+# 7. 保存后续strict malignant composition和trajectory分析所需对象
+# 8. 记录本步骤的session信息
+
+# 本项目专用数据：
+# GSE215403
+# 12个OSCC单细胞样本：
+# OSCC, scB1, scB2, scB5, scB7, scB8,
+# scB9, scB10, scB12, scB13, scB14, scB15
+#
+# 本脚本采用严格malignant定义：
+# 1. 位于tumor epithelial candidate clusters
+# 2. CopyKAT prediction为aneuploid
+#
+# tumor candidate但未被CopyKAT aneuploid支持的细胞，
+# 标记为Candidate_not_confirmed并保留用于敏感性分析。
+#
+# 通用代码修改位置：
+# 1. 换数据集时：
+#    修改input_object_file和cluster_column
+#
+# 2. 换candidate定义时：
+#    修改tumor_candidate_clusters和salivary_reference_cluster
+#
+# 3. 换关注基因时：
+#    修改target_genes
+#
+# 4. 换final malignant定义时：
+#    修改is_strict_malignant对应的逻辑
+
 
 # ============================================================
-# 用户配置说明
-# ============================================================
-# 运行前请检查以下设置：
-# 1. project_dir：项目根目录。
-# 2. raw_dir：原始数据目录。
-# 3. object_dir：RDS对象输出目录。
-# 4. table_dir：CSV和TXT结果输出目录。
-# 5. figure_dir：PDF图输出目录。
-# 6. 输入文件名：若本地文件名不同，请在对应input_file处修改。
-# 7. 线程数、内存和运行位置：CopyKAT、Seurat聚类和Monocle3建议在服务器或高内存本地环境运行。
-# ============================================================
-
-
-# ============================================================
-# A. R library与包
+# A. 加载包
 # ============================================================
 
 options(timeout = 3600)
@@ -81,7 +95,7 @@ library(tidyr)
 library(ggplot2)
 
 # ============================================================
-# B. 路径
+# B. 项目路径与文件夹
 # ============================================================
 
 project_dir <- getwd()
@@ -109,20 +123,21 @@ dir.create(table_dir, recursive = TRUE, showWarnings = FALSE)
 dir.create(figure_dir, recursive = TRUE, showWarnings = FALSE)
 
 # ============================================================
-# C. 读取06d对象
+# C. 读取07对象
 # ============================================================
 
 input_object_file <- file.path(
   object_dir,
-  "06d_GSE215403_CopyKAT_malignant_call.rds"
+  "07_CopyKAT_malignant_call.rds"
 )
 
 if (!file.exists(input_object_file)) {
   
   stop(
     paste0(
-      "找不到06d对象：\n",
-      input_object_file
+      "找不到07对象：\n",
+      input_object_file,
+      "\n请先运行07_CopyKAT_malignant_call.R"
     )
   )
 }
@@ -156,7 +171,7 @@ if (length(missing_metadata) > 0) {
 }
 
 # ============================================================
-# D. 固定参数
+# D. 设置分析参数
 # ============================================================
 
 tumor_candidate_clusters <- c(
@@ -213,6 +228,18 @@ sc$copykat_prediction_clean <- factor(
 # ============================================================
 # F. 定义最终分析分组
 # ============================================================
+
+# Strict_malignant_CopyKAT_aneuploid：
+# tumor epithelial candidate且CopyKAT prediction为aneuploid。
+#
+# Tumor_candidate_not_confirmed：
+# tumor epithelial candidate但CopyKAT未支持aneuploid。
+#
+# Salivary_epithelial_reference：
+# salivary/normal-like epithelial reference。
+#
+# Other_cells：
+# 其余免疫、基质、血管和其他非候选细胞。
 
 is_tumor_candidate <- cluster_vector %in%
   tumor_candidate_clusters
@@ -271,7 +298,7 @@ meta <- sc@meta.data %>%
   )
 
 # ============================================================
-# H. 总体汇总
+# H. 输出最终状态总体汇总
 # ============================================================
 
 final_status_summary <- meta %>%
@@ -290,7 +317,7 @@ write.csv(
   final_status_summary,
   file.path(
     table_dir,
-    "06e_final_malignant_status_summary.csv"
+    "08_final_malignant_status_summary.csv"
   ),
   row.names = FALSE
 )
@@ -324,7 +351,7 @@ write.csv(
   candidate_prediction_overall,
   file.path(
     table_dir,
-    "06e_CopyKAT_prediction_overall_clean.csv"
+    "08_CopyKAT_prediction_overall_clean.csv"
   ),
   row.names = FALSE
 )
@@ -361,7 +388,7 @@ write.csv(
   aneuploid_by_cluster,
   file.path(
     table_dir,
-    "06e_aneuploid_fraction_by_cluster.csv"
+    "08_aneuploid_fraction_by_cluster.csv"
   ),
   row.names = FALSE
 )
@@ -400,7 +427,7 @@ write.csv(
   aneuploid_by_sample_cluster,
   file.path(
     table_dir,
-    "06e_aneuploid_fraction_by_sample_cluster.csv"
+    "08_aneuploid_fraction_by_sample_cluster.csv"
   ),
   row.names = FALSE
 )
@@ -440,7 +467,7 @@ p_final_status_umap <- DimPlot(
 ggsave(
   filename = file.path(
     figure_dir,
-    "06e_final_malignant_status_UMAP.pdf"
+    "08_final_malignant_status_UMAP.pdf"
   ),
   plot = p_final_status_umap,
   width = 12,
@@ -499,7 +526,7 @@ p_aneuploid_cluster <- ggplot(
 ggsave(
   filename = file.path(
     figure_dir,
-    "06e_CopyKAT_aneuploid_fraction_by_cluster.pdf"
+    "08_CopyKAT_aneuploid_fraction_by_cluster.pdf"
   ),
   plot = p_aneuploid_cluster,
   width = 10,
@@ -556,7 +583,7 @@ p_aneuploid_sample_cluster <- ggplot(
 ggsave(
   filename = file.path(
     figure_dir,
-    "06e_CopyKAT_aneuploid_fraction_by_sample_cluster.pdf"
+    "08_CopyKAT_aneuploid_fraction_by_sample_cluster.pdf"
   ),
   plot = p_aneuploid_sample_cluster,
   width = 10,
@@ -638,7 +665,7 @@ write.csv(
   target_expression_summary,
   file.path(
     table_dir,
-    "06e_core_gene_expression_by_final_status.csv"
+    "08_core_gene_expression_by_final_status.csv"
   ),
   row.names = FALSE
 )
@@ -664,7 +691,7 @@ write.csv(
   target_expression_pseudobulk,
   file.path(
     table_dir,
-    "06e_core_gene_pseudobulk_by_sample.csv"
+    "08_core_gene_pseudobulk_by_sample.csv"
   ),
   row.names = FALSE
 )
@@ -704,7 +731,7 @@ p_target_expression <- ggplot(
 ggsave(
   filename = file.path(
     figure_dir,
-    "06e_core_gene_expression_by_final_status.pdf"
+    "08_core_gene_expression_by_final_status.pdf"
   ),
   plot = p_target_expression,
   width = 10,
@@ -712,7 +739,7 @@ ggsave(
 )
 
 # ============================================================
-# O. 保存对象与session信息
+# O. 保存对象与环境信息
 # ============================================================
 
 sc$analysis_stage <- "final_CopyKAT_supported_malignant_call"
@@ -721,7 +748,7 @@ saveRDS(
   sc,
   file.path(
     object_dir,
-    "06e_GSE215403_final_malignant_call.rds"
+    "08_final_malignant_call.rds"
   )
 )
 
@@ -729,23 +756,26 @@ writeLines(
   capture.output(sessionInfo()),
   con = file.path(
     table_dir,
-    "06e_sessionInfo.txt"
+    "08_sessionInfo.txt"
   )
 )
 
 # ============================================================
-# P. 完成提示
+# P. 最终提示
 # ============================================================
 
 message("\n============================================================")
-message("06e_finalize_malignant_call.R运行完成。")
+message("08_finalize_malignant_call.R运行完成。")
 message("")
-message("重点查看：")
-message("1. results/figures/06e_final_malignant_status_UMAP.pdf")
-message("2. results/figures/06e_CopyKAT_aneuploid_fraction_by_cluster.pdf")
-message("3. results/figures/06e_CopyKAT_aneuploid_fraction_by_sample_cluster.pdf")
-message("4. results/figures/06e_core_gene_expression_by_final_status.pdf")
-message("5. results/tables/06e_aneuploid_fraction_by_cluster.csv")
-message("6. results/tables/06e_aneuploid_fraction_by_sample_cluster.csv")
-message("7. results/tables/06e_core_gene_expression_by_final_status.csv")
+message("已保存对象：")
+message("results/objects/08_final_malignant_call.rds")
+message("")
+message("请重点查看：")
+message("1. results/figures/08_final_malignant_status_UMAP.pdf")
+message("2. results/figures/08_CopyKAT_aneuploid_fraction_by_cluster.pdf")
+message("3. results/figures/08_CopyKAT_aneuploid_fraction_by_sample_cluster.pdf")
+message("4. results/figures/08_core_gene_expression_by_final_status.pdf")
+message("5. results/tables/08_aneuploid_fraction_by_cluster.csv")
+message("6. results/tables/08_aneuploid_fraction_by_sample_cluster.csv")
+message("7. results/tables/08_core_gene_expression_by_final_status.csv")
 message("============================================================\n")

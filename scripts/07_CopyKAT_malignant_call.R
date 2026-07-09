@@ -1,39 +1,43 @@
-# ============================================================
-# 06d_CopyKAT_malignant_call.R
+# 07_CopyKAT_malignant_call.R
+
+# 本脚本功能：
+# 1. 读取06定义tumor epithelial candidate后的Seurat object
+# 2. 按sample_id单独运行CopyKAT
+# 3. 使用同一样本内的非tumor epithelial candidate细胞作为known normal reference
+# 4. 获得CopyKAT的diploid/aneuploid prediction
+# 5. 将CopyKAT预测结果回填到Seurat metadata
+# 6. 重点汇总cluster 2、3、4、6、11的CopyKAT预测结果
+# 7. 输出CopyKAT诊断UMAP和candidate aneuploid UMAP
+# 8. 保存供后续final malignant call使用的对象
+
+# 本项目专用数据：
+# GSE215403
+# 12个OSCC单细胞样本：
+# OSCC, scB1, scB2, scB5, scB7, scB8,
+# scB9, scB10, scB12, scB13, scB14, scB15
 #
-# 目标：
-# 1. 按 sample_id 单独运行 CopyKAT
-# 2. 使用同一样本内的非 tumor epithelial candidate 细胞
-#    作为已知 normal reference
-# 3. 获得 CopyKAT 的 diploid / aneuploid prediction
-# 4. 回填到原始 Seurat metadata
-# 5. 重点汇总 cluster 2 / 3 / 4 / 6 / 11 的预测结果
-#
-# 说明：
-# CopyKAT prediction 是基于 scRNA-seq 推断的 CNV/aneuploidy 结果，
-#
-# 后续 malignant cell 定义将结合：
-# - tumor epithelial marker
+# CopyKAT prediction是基于scRNA-seq推断的CNV/aneuploidy结果。
+# 后续final malignant cell定义会结合：
+# - tumor epithelial candidate identity
 # - CopyKAT aneuploid prediction
 # - sample-level consistency
-# ============================================================
+#
+# 通用代码修改位置：
+# 1. 换数据集时：
+#    修改input_object_file、cluster_column和sample_column
+#
+# 2. 换candidate定义时：
+#    修改tumor_candidate_clusters
+#
+# 3. 调整CopyKAT运行门槛时：
+#    修改min_tumor_cells和min_normal_cells
+#
+# 4. 调整CopyKAT参数时：
+#    修改copykat()中的ngene.chr、win.size、KS.cut、genome和n.cores
+
 
 # ============================================================
-# 用户配置说明
-# ============================================================
-# 运行前请检查以下设置：
-# 1. project_dir：项目根目录。
-# 2. raw_dir：原始数据目录。
-# 3. object_dir：RDS对象输出目录。
-# 4. table_dir：CSV和TXT结果输出目录。
-# 5. figure_dir：PDF图输出目录。
-# 6. 输入文件名：若本地文件名不同，请在对应input_file处修改。
-# 7. 线程数、内存和运行位置：CopyKAT、Seurat聚类和Monocle3建议在服务器或高内存本地环境运行。
-# ============================================================
-
-
-# ============================================================
-# A. R library 与包
+# A. 加载包
 # ============================================================
 
 options(timeout = 3600)
@@ -79,9 +83,9 @@ if (length(missing_packages) > 0) {
   
   stop(
     paste0(
-      "缺少 R 包：",
+      "缺少R包：",
       paste(missing_packages, collapse = ", "),
-      "\n请先完成 CopyKAT 安装。"
+      "\n请先完成CopyKAT安装。"
     )
   )
 }
@@ -95,7 +99,7 @@ library(ggplot2)
 library(Matrix)
 
 # ============================================================
-# B. 项目路径
+# B. 项目路径与文件夹
 # ============================================================
 
 project_dir <- getwd()
@@ -130,20 +134,21 @@ dir.create(figure_dir, recursive = TRUE, showWarnings = FALSE)
 dir.create(copykat_dir, recursive = TRUE, showWarnings = FALSE)
 
 # ============================================================
-# C. 读取 06b 对象
+# C. 读取06对象
 # ============================================================
 
 input_object_file <- file.path(
   object_dir,
-  "06b_GSE215403_malignant_candidate_diagnostic.rds"
+  "06_malignant_candidate_diagnostic.rds"
 )
 
 if (!file.exists(input_object_file)) {
   
   stop(
     paste0(
-      "找不到对象：\n",
-      input_object_file
+      "找不到06对象：\n",
+      input_object_file,
+      "\n请先运行06_malignant_candidate_diagnostic.R"
     )
   )
 }
@@ -172,14 +177,14 @@ if (length(missing_metadata) > 0) {
   
   stop(
     paste0(
-      "缺少 metadata：",
+      "缺少metadata：",
       paste(missing_metadata, collapse = ", ")
     )
   )
 }
 
 # ============================================================
-# D. 参数
+# D. 设置CopyKAT输入参数
 # ============================================================
 
 tumor_candidate_clusters <- c(
@@ -190,24 +195,24 @@ tumor_candidate_clusters <- c(
   "11"
 )
 
-# 每个 sample 至少需要：
-# - 50 个 tumor epithelial candidate
-# - 50 个 known normal reference cells
+# 每个sample至少需要：
+# - 50个tumor epithelial candidate
+# - 50个known normal reference cells
 #
-# 不满足时跳过，避免 CopyKAT 在极小样本中产生不稳定预测。
+# 不满足时跳过，避免CopyKAT在极小样本中产生不稳定预测。
 
 min_tumor_cells <- 50
 min_normal_cells <- 50
 
-# Eddie 当前申请一个 CPU slot，因此设为 1。
-# 以后改成多核 qlogin 后，可相应提高。
+# 当前设置为单核运行。
+# 如果服务器或本地环境允许多核，可以相应提高。
 
 copykat_cores <- 1
 
 set.seed(1234)
 
 # ============================================================
-# E. 获取 raw count matrix
+# E. 获取raw count matrix
 # ============================================================
 
 raw_counts <- LayerData(
@@ -260,7 +265,7 @@ write.csv(
   sample_summary,
   file.path(
     table_dir,
-    "06d_CopyKAT_sample_input_summary.csv"
+    "07_CopyKAT_sample_input_summary.csv"
   ),
   row.names = FALSE
 )
@@ -268,13 +273,13 @@ write.csv(
 print(sample_summary)
 
 # ============================================================
-# G. 按 sample 独立运行 CopyKAT
+# G. 按sample独立运行CopyKAT
 # ============================================================
-#
+
 # 关键点：
-# 1. 每个 sample 独立运行，避免 patient-to-patient 差异混入。
-# 3. non-tumor candidate 细胞作为已知 normal reference。
-# ============================================================
+# 1. 每个sample独立运行，避免patient-to-patient差异混入。
+# 2. non-tumor candidate细胞作为known normal reference。
+# 3. 如果某个sample已经有完整prediction文件，则直接复用。
 
 prediction_list <- list()
 run_summary_list <- list()
@@ -282,7 +287,7 @@ run_summary_list <- list()
 for (current_sample in sample_ids) {
   
   message("\n============================================================")
-  message("开始 CopyKAT：", current_sample)
+  message("开始CopyKAT：", current_sample)
   message("============================================================")
   
   current_meta <- meta %>%
@@ -303,67 +308,69 @@ for (current_sample in sample_ids) {
   n_tumor <- length(current_tumor_cells)
   n_normal <- length(current_normal_cells)
   n_total <- length(current_cells)
+  
   # ------------------------------------------------------------
-# 断点续跑：
-# 若该 sample 已存在完整且细胞数匹配的 prediction 文件，
-# 则直接读取并跳过 CopyKAT 重算。
-# ------------------------------------------------------------
-
-existing_prediction_file <- file.path(
-  copykat_dir,
-  paste0(
-    "06d_CopyKAT_",
-    current_sample
-  ),
-  paste0(
-    "06d_CopyKAT_",
-    current_sample,
-    "_cell_prediction.csv"
-  )
-)
-
-if (file.exists(existing_prediction_file)) {
+  # 断点续跑：
+  # 如果该sample已存在完整且细胞数匹配的prediction文件，
+  # 则直接读取并跳过CopyKAT重算。
+  # ------------------------------------------------------------
   
-  existing_prediction <- read.csv(
-    existing_prediction_file,
-    stringsAsFactors = FALSE
+  existing_prediction_file <- file.path(
+    copykat_dir,
+    paste0(
+      "07_CopyKAT_",
+      current_sample
+    ),
+    paste0(
+      "07_CopyKAT_",
+      current_sample,
+      "_cell_prediction.csv"
+    )
   )
   
-  required_prediction_columns <- c(
-    "cell_barcode",
-    "copykat_prediction",
-    "copykat_sample"
-  )
-  
-  prediction_is_complete <- all(
-    required_prediction_columns %in%
-      colnames(existing_prediction)
-  ) &&
-    nrow(existing_prediction) == n_total &&
-    all(current_cells %in% existing_prediction$cell_barcode)
-  
-  if (prediction_is_complete) {
+  if (file.exists(existing_prediction_file)) {
     
-    prediction_list[[current_sample]] <- existing_prediction
-    
-    run_summary_list[[current_sample]] <- data.frame(
-      sample_id = current_sample,
-      total_cells = n_total,
-      tumor_candidate_cells = n_tumor,
-      known_normal_cells = n_normal,
-      CopyKAT_status = "reused_existing_result",
-      note = "existing complete prediction reused",
+    existing_prediction <- read.csv(
+      existing_prediction_file,
       stringsAsFactors = FALSE
     )
     
-    message(
-      "检测到已完成 CopyKAT 输出，跳过重算：",
-      current_sample
+    required_prediction_columns <- c(
+      "cell_barcode",
+      "copykat_prediction",
+      "copykat_sample"
     )
     
-    next
+    prediction_is_complete <- all(
+      required_prediction_columns %in%
+        colnames(existing_prediction)
+    ) &&
+      nrow(existing_prediction) == n_total &&
+      all(current_cells %in% existing_prediction$cell_barcode)
+    
+    if (prediction_is_complete) {
+      
+      prediction_list[[current_sample]] <- existing_prediction
+      
+      run_summary_list[[current_sample]] <- data.frame(
+        sample_id = current_sample,
+        total_cells = n_total,
+        tumor_candidate_cells = n_tumor,
+        known_normal_cells = n_normal,
+        CopyKAT_status = "reused_existing_result",
+        note = "existing complete prediction reused",
+        stringsAsFactors = FALSE
+      )
+      
+      message(
+        "检测到已完成CopyKAT输出，跳过重算：",
+        current_sample
+      )
+      
+      next
+    }
   }
-}
+  
   current_status <- "not_run"
   current_note <- ""
   
@@ -386,7 +393,7 @@ if (file.exists(existing_prediction_file)) {
     current_output_dir <- file.path(
       copykat_dir,
       paste0(
-        "06d_CopyKAT_",
+        "07_CopyKAT_",
         current_sample
       )
     )
@@ -406,8 +413,8 @@ if (file.exists(existing_prediction_file)) {
       drop = FALSE
     ]
     
-    # CopyKAT 官方示例使用 raw UMI matrix。
-    # 输入需要 dense matrix，因此仅在单个 sample 内转换。
+    # CopyKAT官方示例使用raw UMI matrix。
+    # 输入需要dense matrix，因此仅在单个sample内转换。
     
     current_raw_matrix <- as.matrix(
       current_raw_counts
@@ -436,7 +443,7 @@ if (file.exists(existing_prediction_file)) {
       error = function(e) {
         
         message(
-          "CopyKAT 失败：",
+          "CopyKAT失败：",
           conditionMessage(e)
         )
         
@@ -464,7 +471,7 @@ if (file.exists(existing_prediction_file)) {
         file.path(
           current_output_dir,
           paste0(
-            "06d_CopyKAT_",
+            "07_CopyKAT_",
             current_sample,
             "_result.rds"
           )
@@ -476,7 +483,7 @@ if (file.exists(existing_prediction_file)) {
         stringsAsFactors = FALSE
       )
       
-      # CopyKAT 通常输出 cell.names 和 copykat.pred。
+      # CopyKAT通常输出cell.names和copykat.pred。
       # 此处检查列名，避免静默写错。
       
       if (!all(
@@ -511,7 +518,7 @@ if (file.exists(existing_prediction_file)) {
           file.path(
             current_output_dir,
             paste0(
-              "06d_CopyKAT_",
+              "07_CopyKAT_",
               current_sample,
               "_cell_prediction.csv"
             )
@@ -543,7 +550,7 @@ write.csv(
   run_summary,
   file.path(
     table_dir,
-    "06d_CopyKAT_run_summary.csv"
+    "07_CopyKAT_run_summary.csv"
   ),
   row.names = FALSE
 )
@@ -551,13 +558,13 @@ write.csv(
 print(run_summary)
 
 # ============================================================
-# H. 合并 CopyKAT prediction
+# H. 合并CopyKAT prediction
 # ============================================================
 
 if (length(prediction_list) == 0) {
   
   stop(
-    "没有任何 sample 成功完成 CopyKAT。请检查 06d_CopyKAT_run_summary.csv。"
+    "没有任何sample成功完成CopyKAT。请检查07_CopyKAT_run_summary.csv。"
   )
 }
 
@@ -569,7 +576,7 @@ write.csv(
   copykat_prediction_all,
   file.path(
     table_dir,
-    "06d_CopyKAT_all_cell_predictions.csv"
+    "07_CopyKAT_all_cell_predictions.csv"
   ),
   row.names = FALSE
 )
@@ -605,7 +612,7 @@ sc$copykat_prediction <- factor(
 )
 
 # ============================================================
-# I. 汇总 tumor epithelial candidate 的 CopyKAT 结果
+# I. 汇总tumor epithelial candidate的CopyKAT结果
 # ============================================================
 
 candidate_prediction_summary <- sc@meta.data %>%
@@ -646,7 +653,7 @@ write.csv(
   candidate_prediction_summary,
   file.path(
     table_dir,
-    "06d_CopyKAT_tumor_candidate_prediction_by_sample_cluster.csv"
+    "07_CopyKAT_tumor_candidate_prediction_by_sample_cluster.csv"
   ),
   row.names = FALSE
 )
@@ -685,7 +692,7 @@ write.csv(
   candidate_prediction_overall,
   file.path(
     table_dir,
-    "06d_CopyKAT_tumor_candidate_prediction_overall.csv"
+    "07_CopyKAT_tumor_candidate_prediction_overall.csv"
   ),
   row.names = FALSE
 )
@@ -725,7 +732,7 @@ p_copykat_umap <- DimPlot(
 ggsave(
   filename = file.path(
     figure_dir,
-    "06d_CopyKAT_prediction_UMAP.pdf"
+    "07_CopyKAT_prediction_UMAP.pdf"
   ),
   plot = p_copykat_umap,
   width = 12,
@@ -733,7 +740,7 @@ ggsave(
 )
 
 # ============================================================
-# K. UMAP：只突出 tumor epithelial candidate 中的 aneuploid
+# K. UMAP：突出tumor epithelial candidate中的aneuploid细胞
 # ============================================================
 
 candidate_copykat_status <- rep(
@@ -798,7 +805,7 @@ p_candidate_copykat_umap <- DimPlot(
 ggsave(
   filename = file.path(
     figure_dir,
-    "06d_CopyKAT_aneuploid_tumor_candidate_UMAP.pdf"
+    "07_CopyKAT_aneuploid_tumor_candidate_UMAP.pdf"
   ),
   plot = p_candidate_copykat_umap,
   width = 12,
@@ -806,16 +813,15 @@ ggsave(
 )
 
 # ============================================================
-# L. 定义严格 malignant call
+# L. 定义严格malignant call
 # ============================================================
-#
+
 # 严格定义：
-# 1. 位于 tumor epithelial candidate cluster
+# 1. 位于tumor epithelial candidate cluster
 # 2. CopyKAT predicted aneuploid
 #
-# diploid / not.defined candidate 不直接删除，
-# 仅标为 non-confirmed，保留用于敏感性分析。
-# ============================================================
+# diploid/not.defined candidate不直接删除。
+# 它们标记为non-confirmed，保留用于敏感性分析。
 
 sc$malignant_call_copykat <- "Other_cells"
 
@@ -841,7 +847,7 @@ sc$malignant_call_copykat <- factor(
 )
 
 # ============================================================
-# M. 保存对象与 session 信息
+# M. 保存对象和环境信息
 # ============================================================
 
 sc$analysis_stage <- "CopyKAT_samplewise_malignant_call_completed"
@@ -850,7 +856,7 @@ saveRDS(
   sc,
   file.path(
     object_dir,
-    "06d_GSE215403_CopyKAT_malignant_call.rds"
+    "07_CopyKAT_malignant_call.rds"
   )
 )
 
@@ -858,21 +864,24 @@ writeLines(
   capture.output(sessionInfo()),
   con = file.path(
     table_dir,
-    "06d_CopyKAT_sessionInfo.txt"
+    "07_CopyKAT_sessionInfo.txt"
   )
 )
 
 # ============================================================
-# N. 完成提示
+# N. 最终提示
 # ============================================================
 
 message("\n============================================================")
-message("06d_CopyKAT_malignant_call.R 运行完成。")
+message("07_CopyKAT_malignant_call.R 运行完成。")
 message("")
-message("重点查看：")
-message("1. results/tables/06d_CopyKAT_run_summary.csv")
-message("2. results/tables/06d_CopyKAT_tumor_candidate_prediction_overall.csv")
-message("3. results/tables/06d_CopyKAT_tumor_candidate_prediction_by_sample_cluster.csv")
-message("4. results/figures/06d_CopyKAT_prediction_UMAP.pdf")
-message("5. results/figures/06d_CopyKAT_aneuploid_tumor_candidate_UMAP.pdf")
+message("已保存对象：")
+message("results/objects/07_CopyKAT_malignant_call.rds")
+message("")
+message("请重点查看：")
+message("1. results/tables/07_CopyKAT_run_summary.csv")
+message("2. results/tables/07_CopyKAT_tumor_candidate_prediction_overall.csv")
+message("3. results/tables/07_CopyKAT_tumor_candidate_prediction_by_sample_cluster.csv")
+message("4. results/figures/07_CopyKAT_prediction_UMAP.pdf")
+message("5. results/figures/07_CopyKAT_aneuploid_tumor_candidate_UMAP.pdf")
 message("============================================================\n")

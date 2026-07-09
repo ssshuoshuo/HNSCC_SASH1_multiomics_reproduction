@@ -1,5 +1,5 @@
 # ============================================================
-# 09a_GSE252265_spatial_download_QC_gene_maps_local.R
+# 12_spatial_download_QC_gene_maps_local.R
 #
 # 目的：
 # 1. 下载GSE252265公开Visium空间转录组数据；
@@ -598,7 +598,7 @@ write.csv(
   spatial_positions,
   file.path(
     table_dir,
-    "09a_raw_tissue_positions_table.csv"
+    "12_raw_tissue_positions_table.csv"
   ),
   row.names = FALSE
 )
@@ -846,7 +846,7 @@ write.csv(
   barcode_match_summary,
   file.path(
     table_dir,
-    "09a_barcode_coordinate_match_summary.csv"
+    "12_barcode_coordinate_match_summary.csv"
   ),
   row.names = FALSE
 )
@@ -865,8 +865,8 @@ if (exact_match_percent < 80) {
       exact_match_percent,
       "%。",
       "\n\n请将以下两个文件发回：",
-      "\n1. 09a_barcode_coordinate_match_summary.csv",
-      "\n2. 09a_raw_tissue_positions_table.csv",
+      "\n1. 12_barcode_coordinate_match_summary.csv",
+      "\n2. 12_raw_tissue_positions_table.csv",
       "\n不要继续做空间表达图。"
     )
   )
@@ -986,7 +986,7 @@ write.csv(
   spot_qc_summary,
   file.path(
     table_dir,
-    "09a_spatial_spot_QC_summary.csv"
+    "12_spatial_spot_QC_summary.csv"
   ),
   row.names = FALSE
 )
@@ -995,7 +995,7 @@ write.csv(
   spot_qc_table,
   file.path(
     table_dir,
-    "09a_spatial_spot_QC_cell_metadata.csv"
+    "12_spatial_spot_QC_cell_metadata.csv"
   ),
   row.names = FALSE
 )
@@ -1227,7 +1227,7 @@ p_spatial_mt <- make_spatial_qc_plot(
 ggsave(
   filename = file.path(
     figure_dir,
-    "09a_spatial_QC_UMI_distribution.pdf"
+    "12_spatial_QC_UMI_distribution.pdf"
   ),
   plot = p_spatial_umi,
   width = 14,
@@ -1237,7 +1237,7 @@ ggsave(
 ggsave(
   filename = file.path(
     figure_dir,
-    "09a_spatial_QC_detected_gene_distribution.pdf"
+    "12_spatial_QC_detected_gene_distribution.pdf"
   ),
   plot = p_spatial_feature,
   width = 14,
@@ -1247,7 +1247,7 @@ ggsave(
 ggsave(
   filename = file.path(
     figure_dir,
-    "09a_spatial_QC_percent_mt_distribution.pdf"
+    "12_spatial_QC_percent_mt_distribution.pdf"
   ),
   plot = p_spatial_mt,
   width = 14,
@@ -1287,7 +1287,7 @@ p_target_gene_spatial <- patchwork::wrap_plots(
 ggsave(
   filename = file.path(
     figure_dir,
-    "09a_SASH1_COL1A1_EMP1_MYH11_spatial_expression.pdf"
+    "12_SASH1_COL1A1_EMP1_MYH11_spatial_expression.pdf"
   ),
   plot = p_target_gene_spatial,
   width = 16,
@@ -1343,7 +1343,7 @@ write.csv(
   spatial_gene_summary,
   file.path(
     table_dir,
-    "09a_SASH1_COL1A1_spot_detection_summary.csv"
+    "12_SASH1_COL1A1_spot_detection_summary.csv"
   ),
   row.names = FALSE
 )
@@ -1352,7 +1352,7 @@ write.csv(
   spatial_plot_data,
   file.path(
     table_dir,
-    "09a_spatial_tissue_spot_expression_metadata.csv"
+    "12_spatial_tissue_spot_expression_metadata.csv"
   ),
   row.names = FALSE
 )
@@ -1365,7 +1365,7 @@ saveRDS(
   spatial_tissue,
   file.path(
     object_dir,
-    "09a_GSE252265_spatial_tissue_spots_Seurat.rds"
+    "12_spatial_tissue_spots_Seurat.rds"
   ),
   compress = FALSE
 )
@@ -1376,7 +1376,7 @@ writeLines(
   ),
   con = file.path(
     table_dir,
-    "09a_sessionInfo.txt"
+    "12_sessionInfo.txt"
   )
 )
 
@@ -1387,43 +1387,43 @@ writeLines(
 required_output_files <- c(
   file.path(
     object_dir,
-    "09a_GSE252265_spatial_tissue_spots_Seurat.rds"
+    "12_spatial_tissue_spots_Seurat.rds"
   ),
   file.path(
     table_dir,
-    "09a_GSE252265_input_file_inventory.csv"
+    "12_input_file_inventory.csv"
   ),
   file.path(
     table_dir,
-    "09a_raw_tissue_positions_table.csv"
+    "12_raw_tissue_positions_table.csv"
   ),
   file.path(
     table_dir,
-    "09a_barcode_coordinate_match_summary.csv"
+    "12_barcode_coordinate_match_summary.csv"
   ),
   file.path(
     table_dir,
-    "09a_spatial_spot_QC_summary.csv"
+    "12_spatial_spot_QC_summary.csv"
   ),
   file.path(
     table_dir,
-    "09a_SASH1_COL1A1_spot_detection_summary.csv"
+    "12_SASH1_COL1A1_spot_detection_summary.csv"
   ),
   file.path(
     figure_dir,
-    "09a_spatial_QC_UMI_distribution.pdf"
+    "12_spatial_QC_UMI_distribution.pdf"
   ),
   file.path(
     figure_dir,
-    "09a_spatial_QC_detected_gene_distribution.pdf"
+    "12_spatial_QC_detected_gene_distribution.pdf"
   ),
   file.path(
     figure_dir,
-    "09a_spatial_QC_percent_mt_distribution.pdf"
+    "12_spatial_QC_percent_mt_distribution.pdf"
   ),
   file.path(
     figure_dir,
-    "09a_SASH1_COL1A1_EMP1_MYH11_spatial_expression.pdf"
+    "12_SASH1_COL1A1_EMP1_MYH11_spatial_expression.pdf"
   )
 )
 
@@ -1439,7 +1439,7 @@ write.csv(
   output_status,
   file.path(
     table_dir,
-    "09a_output_file_check.csv"
+    "12_output_file_check.csv"
   ),
   row.names = FALSE
 )
@@ -1452,10 +1452,10 @@ message("\n============================================================")
 message("09a GSE252265空间转录组下载、QC和核心基因空间图完成。")
 message("")
 message("重点查看：")
-message("1. 09a_spatial_spot_QC_summary.csv")
-message("2. 09a_SASH1_COL1A1_spot_detection_summary.csv")
-message("3. 09a_spatial_QC_UMI_distribution.pdf")
-message("4. 09a_SASH1_COL1A1_EMP1_MYH11_spatial_expression.pdf")
+message("1. 12_spatial_spot_QC_summary.csv")
+message("2. 12_SASH1_COL1A1_spot_detection_summary.csv")
+message("3. 12_spatial_QC_UMI_distribution.pdf")
+message("4. 12_SASH1_COL1A1_EMP1_MYH11_spatial_expression.pdf")
 message("")
 message("下一步将根据合格样本，正式进行：")
 message("SASH1与COL1A1-high纤维化区域的空间排他 / 邻近统计分析。")

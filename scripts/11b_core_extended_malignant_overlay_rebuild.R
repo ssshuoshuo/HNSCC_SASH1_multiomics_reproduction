@@ -1,43 +1,42 @@
-# ============================================================
-# 08e_core_extended_malignant_overlay_rebuild_local.R
+# 11b_core_extended_malignant_overlay_rebuild.R
+
+# 本脚本功能：
+# 1. 基于04全细胞Seurat对象重新构建Monocle3 global graph
+# 2. 比较两套论文式Malignant_Focused定义
+# 3. Core_Malignant_Focused定义为cluster 6+11
+# 4. Extended_Malignant_Focused定义为cluster 4+6+11
+# 5. 分别输出Core和Extended的Malignant-Focused binary overlay
+# 6. 分别输出SASH1、MYH11、EMP1、COL1A1 gene overlays
+# 7. 输出gene overlay摘要表
+# 8. 保存cell-level Monocle3 UMAP坐标、principal graph vertex和edge坐标
+# 9. 记录本步骤session信息，避免后续再次重建trajectory
+
+# 本项目专用数据：
+# GSE215403
+# 12个OSCC单细胞样本：
+# OSCC, scB1, scB2, scB5, scB7, scB8,
+# scB9, scB10, scB12, scB13, scB14, scB15
 #
-# 目的：
-# 1. 基于04b全细胞对象重新构建08b同逻辑的Monocle3 global graph；
-# 3. 比较两套论文式Malignant_Focused定义：
+# 本步骤的global graph是全细胞state graph。
+# 它用于展示Malignant_Focused细胞在全局细胞状态图中的位置，
+# 不等同于严格意义上的pseudotime排序。
 #
-#    Core_Malignant_Focused
-#    = cluster 6 + 11
+# 通用代码修改位置：
+# 1. 换数据集时：
+#    修改input_file和cluster_column
 #
-#    Extended_Malignant_Focused
-#    = cluster 4 + 6 + 11
+# 2. 换Core/Extended定义时：
+#    修改core_malignant_focus和extended_malignant_focus对应的cluster
 #
-# 4. 对每套定义分别输出：
-#    - Malignant-Focused binary overlay；
-#    - SASH1 / MYH11 / EMP1 / COL1A1 gene overlays；
-#    - 基因表达摘要表；
-# 5. 保存cell-level Monocle3 UMAP坐标与principal graph edge，
-#    避免后续再次重建trajectory。
+# 3. 换关注基因时：
+#    修改target_genes
 #
-# 注意：
-# 本步骤的global graph是全细胞state graph，
-# ============================================================
+# 4. 调整Monocle3图构建参数时：
+#    修改preprocess_cds、reduce_dimension、cluster_cells和learn_graph参数
+
 
 # ============================================================
-# 用户配置说明
-# ============================================================
-# 运行前请检查以下设置：
-# 1. project_dir：项目根目录。
-# 2. raw_dir：原始数据目录。
-# 3. object_dir：RDS对象输出目录。
-# 4. table_dir：CSV和TXT结果输出目录。
-# 5. figure_dir：PDF图输出目录。
-# 6. 输入文件名：若本地文件名不同，请在对应input_file处修改。
-# 7. 线程数、内存和运行位置：CopyKAT、Seurat聚类和Monocle3建议在服务器或高内存本地环境运行。
-# ============================================================
-
-
-# ============================================================
-# A. 包与路径
+# A. 加载包
 # ============================================================
 
 required_packages <- c(
@@ -82,6 +81,10 @@ library(ggplot2)
 library(patchwork)
 library(igraph)
 
+# ============================================================
+# B. 项目路径与文件夹
+# ============================================================
+
 project_dir <- normalizePath(
   "~/Desktop/HNSCC_SASH1_reproduction"
 )
@@ -117,18 +120,18 @@ dir.create(
 )
 
 # ============================================================
-# B. 读取04b全细胞对象
+# C. 读取04全细胞对象
 # ============================================================
 
 input_file <- file.path(
   object_dir,
-  "04b_GSE215403_standard_Seurat_multi_resolution.rds"
+  "04_standard_Seurat_multi_resolution.rds"
 )
 
 if (!file.exists(input_file)) {
   stop(
     paste0(
-      "找不到04b对象：\n",
+      "找不到04对象：\n",
       input_file
     )
   )
@@ -139,17 +142,17 @@ sc <- readRDS(input_file)
 DefaultAssay(sc) <- "RNA"
 
 message(
-  "08e输入细胞数：",
+  "11b输入细胞数：",
   ncol(sc)
 )
 
 message(
-  "08e输入基因数：",
+  "11b输入基因数：",
   nrow(sc)
 )
 
 # ============================================================
-# C. 恢复04b主cluster标签
+# D. 恢复04主cluster标签
 # ============================================================
 
 cluster_column <- "RNA_snn_res.0.2"
@@ -157,7 +160,7 @@ cluster_column <- "RNA_snn_res.0.2"
 if (!cluster_column %in% colnames(sc@meta.data)) {
   stop(
     paste0(
-      "04b对象中未找到：",
+      "04对象中未找到：",
       cluster_column
     )
   )
@@ -261,13 +264,13 @@ write.csv(
   focus_definition_summary,
   file.path(
     table_dir,
-    "08e_malignant_focus_definition_summary.csv"
+    "11b_malignant_focus_definition_summary.csv"
   ),
   row.names = FALSE
 )
 
 # ============================================================
-# D. 创建Monocle3 cell_data_set
+# E. 创建Monocle3 cell_data_set
 # ============================================================
 
 raw_counts <- LayerData(
@@ -298,13 +301,12 @@ rm(raw_counts)
 gc()
 
 # ============================================================
-# E. 重建global Monocle3 UMAP与principal graph
+# F. 重建global Monocle3 UMAP与principal graph
 # ============================================================
-#
-# 参数与08b保持一致。
-# 该步骤只重建Monocle3图形空间；
-# 不影响已有Seurat、CopyKAT和08d结果。
-# ============================================================
+
+# 参数与原global trajectory步骤保持一致。
+# 该步骤只重建Monocle3图形空间，
+# 不影响已有Seurat、CopyKAT和11a审查结果。
 
 set.seed(1234)
 
@@ -345,7 +347,7 @@ cds <- monocle3::learn_graph(
 )
 
 # ============================================================
-# F. 提取每个细胞的Monocle3 UMAP坐标
+# G. 提取每个细胞的Monocle3 UMAP坐标
 # ============================================================
 
 monocle_umap <- reducedDims(
@@ -386,7 +388,7 @@ umap_plot_data <- data.frame(
 )
 
 # ============================================================
-# G. 提取closest vertex与principal graph坐标
+# H. 提取closest vertex与principal graph坐标
 # ============================================================
 
 principal_auxiliary <- monocle3::principal_graph_aux(
@@ -498,7 +500,7 @@ if (
       "dp_mst维度异常：",
       paste(
         dim(graph_coordinate_matrix),
-        collapse = " × "
+        collapse = "×"
       )
     )
   )
@@ -523,7 +525,7 @@ if (
 }
 
 # ============================================================
-# H. 提取principal graph edge坐标
+# I. 提取principal graph edge坐标
 # ============================================================
 
 edge_table <- as.data.frame(
@@ -618,12 +620,12 @@ edge_coordinates <- edge_coordinates[
 ]
 
 message(
-  "08e principal graph edge数量：",
+  "11b principal graph edge数量：",
   nrow(edge_coordinates)
 )
 
 # ============================================================
-# I. 仅提取四个目标基因的归一化表达
+# J. 提取四个目标基因的归一化表达
 # ============================================================
 
 target_genes <- c(
@@ -732,7 +734,7 @@ rm(
 gc()
 
 # ============================================================
-# J. 绘制binary focus overlay
+# K. 绘制binary focus overlay
 # ============================================================
 
 make_focus_overlay <- function(
@@ -811,9 +813,9 @@ make_focus_overlay <- function(
 }
 
 # ============================================================
-# K. 绘制gene overlay
+# L. 绘制gene overlay
 # ============================================================
-#
+
 # Background：
 # 非当前focus定义中的细胞。
 #
@@ -823,7 +825,6 @@ make_focus_overlay <- function(
 #
 # High：
 # 当前focus内表达>0，并位于阳性细胞上四分位数的细胞。
-# ============================================================
 
 make_gene_overlay <- function(
     gene_symbol,
@@ -1016,7 +1017,7 @@ make_gene_overlay <- function(
 }
 
 # ============================================================
-# L. 输出Core与Extended两套focus binary图
+# M. 输出Core与Extended两套focus binary图
 # ============================================================
 
 p_core_focus <- make_focus_overlay(
@@ -1042,7 +1043,7 @@ p_focus_comparison <- p_core_focus +
 ggsave(
   filename = file.path(
     figure_dir,
-    "08e_core_vs_extended_malignant_focus_comparison.pdf"
+    "11b_core_vs_extended_malignant_focus_comparison.pdf"
   ),
   plot = p_focus_comparison,
   width = 16,
@@ -1050,7 +1051,7 @@ ggsave(
 )
 
 # ============================================================
-# M. 输出Core与Extended两套四基因overlay
+# N. 输出Core与Extended两套四基因overlay
 # ============================================================
 
 target_genes_for_plot <- intersect(
@@ -1137,7 +1138,7 @@ p_extended_gene_overlay <- patchwork::wrap_plots(
 ggsave(
   filename = file.path(
     figure_dir,
-    "08e_core_malignant_focused_gene_overlays.pdf"
+    "11b_core_malignant_focused_gene_overlays.pdf"
   ),
   plot = p_core_gene_overlay,
   width = 16,
@@ -1147,7 +1148,7 @@ ggsave(
 ggsave(
   filename = file.path(
     figure_dir,
-    "08e_extended_malignant_focused_gene_overlays.pdf"
+    "11b_extended_malignant_focused_gene_overlays.pdf"
   ),
   plot = p_extended_gene_overlay,
   width = 16,
@@ -1163,13 +1164,13 @@ write.csv(
   gene_overlay_summary,
   file.path(
     table_dir,
-    "08e_core_extended_gene_overlay_summary.csv"
+    "11b_core_extended_gene_overlay_summary.csv"
   ),
   row.names = FALSE
 )
 
 # ============================================================
-# N. 保存未来重画所需轻量化数据
+# O. 保存未来重画所需轻量化数据
 # ============================================================
 
 umap_plot_data$closest_vertex <- closest_vertex[
@@ -1180,7 +1181,7 @@ write.csv(
   umap_plot_data,
   file.path(
     table_dir,
-    "08e_monocle3_cell_umap_coordinates_and_focus_labels.csv"
+    "11b_monocle3_cell_umap_coordinates_and_focus_labels.csv"
   ),
   row.names = FALSE
 )
@@ -1189,7 +1190,7 @@ write.csv(
   vertex_coordinates,
   file.path(
     table_dir,
-    "08e_principal_graph_vertex_coordinates.csv"
+    "11b_principal_graph_vertex_coordinates.csv"
   ),
   row.names = FALSE
 )
@@ -1198,7 +1199,7 @@ write.csv(
   edge_coordinates,
   file.path(
     table_dir,
-    "08e_principal_graph_edge_coordinates.csv"
+    "11b_principal_graph_edge_coordinates.csv"
   ),
   row.names = FALSE
 )
@@ -1209,50 +1210,50 @@ writeLines(
   ),
   con = file.path(
     table_dir,
-    "08e_sessionInfo.txt"
+    "11b_sessionInfo.txt"
   )
 )
 
 # ============================================================
-# O. 输出检查与完成提示
+# P. 输出检查与完成提示
 # ============================================================
 
 required_output_files <- c(
   file.path(
     figure_dir,
-    "08e_core_vs_extended_malignant_focus_comparison.pdf"
+    "11b_core_vs_extended_malignant_focus_comparison.pdf"
   ),
   file.path(
     figure_dir,
-    "08e_core_malignant_focused_gene_overlays.pdf"
+    "11b_core_malignant_focused_gene_overlays.pdf"
   ),
   file.path(
     figure_dir,
-    "08e_extended_malignant_focused_gene_overlays.pdf"
+    "11b_extended_malignant_focused_gene_overlays.pdf"
   ),
   file.path(
     table_dir,
-    "08e_malignant_focus_definition_summary.csv"
+    "11b_malignant_focus_definition_summary.csv"
   ),
   file.path(
     table_dir,
-    "08e_core_extended_gene_overlay_summary.csv"
+    "11b_core_extended_gene_overlay_summary.csv"
   ),
   file.path(
     table_dir,
-    "08e_monocle3_cell_umap_coordinates_and_focus_labels.csv"
+    "11b_monocle3_cell_umap_coordinates_and_focus_labels.csv"
   ),
   file.path(
     table_dir,
-    "08e_principal_graph_vertex_coordinates.csv"
+    "11b_principal_graph_vertex_coordinates.csv"
   ),
   file.path(
     table_dir,
-    "08e_principal_graph_edge_coordinates.csv"
+    "11b_principal_graph_edge_coordinates.csv"
   ),
   file.path(
     table_dir,
-    "08e_sessionInfo.txt"
+    "11b_sessionInfo.txt"
   )
 )
 
@@ -1268,7 +1269,7 @@ write.csv(
   output_status,
   file.path(
     table_dir,
-    "08e_output_file_check.csv"
+    "11b_output_file_check.csv"
   ),
   row.names = FALSE
 )
@@ -1278,12 +1279,12 @@ print(
 )
 
 message("\n============================================================")
-message("08e Core / Extended Malignant-Focused overlay完成。")
+message("11b Core/Extended Malignant-Focused overlay完成。")
 message("")
 message("关键图：")
-message("1. 08e_core_vs_extended_malignant_focus_comparison.pdf")
-message("2. 08e_core_malignant_focused_gene_overlays.pdf")
-message("3. 08e_extended_malignant_focused_gene_overlays.pdf")
+message("1. results/figures/11b_core_vs_extended_malignant_focus_comparison.pdf")
+message("2. results/figures/11b_core_malignant_focused_gene_overlays.pdf")
+message("3. results/figures/11b_extended_malignant_focused_gene_overlays.pdf")
 message("")
 message("后续优先用两套focus定义与论文Figure 5对照，")
 message("再决定主图使用Core还是Extended。")

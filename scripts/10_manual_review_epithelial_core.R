@@ -1,37 +1,44 @@
-# ============================================================
-# 07d_manual_review_epithelial_core_local.R
+# 10_manual_review_epithelial_core.R
+
+# 本脚本功能：
+# 1. 读取malignant epithelial state characterization对象
+# 2. 基于内部cluster marker结果进行manual-review epithelial-core refinement
+# 3. 排除明确immune、macrophage、CAF-stromal和lineage-ambiguous内部cluster
+# 4. 对保留的上皮核心细胞集重新构建轻量Seurat object
+# 5. 对上皮核心细胞集重新执行NormalizeData、HVG、ScaleData、PCA、UMAP和聚类
+# 6. 计算Cycling、Cancer-testis、Squamous differentiation和Basal epithelial相对program score
+# 7. 比较SASH1、EMP1、MYH11、COL1A1在内部cluster和相对program中的表达
+# 8. 保存manual-review epithelial-core对象和相关统计表
+
+# 本项目专用数据：
+# GSE215403
+# 12个OSCC单细胞样本：
+# OSCC, scB1, scB2, scB5, scB7, scB8,
+# scB9, scB10, scB12, scB13, scB14, scB15
 #
-# 目的：
-# 1. 基于07c内部cluster marker结果，对恶性候选细胞做透明的
-#    manual-review epithelial-core refinement；
-# 2. 排除明确immune / macrophage / CAF-stromal /
-#    lineage-ambiguous internal clusters；
-# 3. 对保留的上皮核心集重新UMAP；
-# 4. 使用相对标准化program score，而非原始平均表达，
-#    描述Cycling / Cancer-testis / Squamous / Basal程序；
-# 5. 比较SASH1、EMP1、MYH11、COL1A1在不同内部cluster与
-#    相对program中的表达。
+# 本脚本中的core subset表示：
+# 经内部marker审查后保留的上皮核心细胞集。
 #
-# 注意：
-# 这里的core subset是“经内部marker审查后保留的上皮核心细胞集”，
-# ============================================================
+# 该core subset用于辅助理解恶性上皮候选细胞的内部状态，
+# 不直接替代08中的CopyKAT-supported final malignant call。
+#
+# 通用代码修改位置：
+# 1. 换数据集时：
+#    修改input_file和manual_cluster_review
+#
+# 2. 换内部聚类结果时：
+#    修改manual_cluster_review中的internal_cluster和review_decision
+#
+# 3. 换program定义时：
+#    修改cycling_genes、cancer_testis_genes、
+#    squamous_differentiation_genes和basal_epithelial_genes
+#
+# 4. 换关注基因时：
+#    修改core_genes对应的基因列表
+
 
 # ============================================================
-# 用户配置说明
-# ============================================================
-# 运行前请检查以下设置：
-# 1. project_dir：项目根目录。
-# 2. raw_dir：原始数据目录。
-# 3. object_dir：RDS对象输出目录。
-# 4. table_dir：CSV和TXT结果输出目录。
-# 5. figure_dir：PDF图输出目录。
-# 6. 输入文件名：若本地文件名不同，请在对应input_file处修改。
-# 7. 线程数、内存和运行位置：CopyKAT、Seurat聚类和Monocle3建议在服务器或高内存本地环境运行。
-# ============================================================
-
-
-# ============================================================
-# A. 包与路径
+# A. 加载包
 # ============================================================
 
 required_packages <- c(
@@ -70,6 +77,10 @@ library(tidyr)
 library(ggplot2)
 library(patchwork)
 
+# ============================================================
+# B. 项目路径与文件夹
+# ============================================================
+
 project_dir <- normalizePath(
   "~/Desktop/HNSCC_SASH1_reproduction"
 )
@@ -96,18 +107,18 @@ dir.create(table_dir, recursive = TRUE, showWarnings = FALSE)
 dir.create(figure_dir, recursive = TRUE, showWarnings = FALSE)
 
 # ============================================================
-# B. 读取07c对象
+# C. 读取malignant epithelial state characterization对象
 # ============================================================
 
 input_file <- file.path(
   object_dir,
-  "07c_GSE215403_malignant_epithelial_state_characterization.rds"
+  "10_malignant_epithelial_state_characterization.rds"
 )
 
 if (!file.exists(input_file)) {
   stop(
     paste0(
-      "找不到07c对象：\n",
+      "找不到输入对象：\n",
       input_file
     )
   )
@@ -119,24 +130,36 @@ DefaultAssay(sc) <- "RNA"
 
 if (!"seurat_clusters" %in% colnames(sc@meta.data)) {
   stop(
-    "07c对象中缺少seurat_clusters。"
+    "输入对象中缺少seurat_clusters。"
   )
 }
 
 if (!"sample_id" %in% colnames(sc@meta.data)) {
   stop(
-    "07c对象中缺少sample_id。"
+    "输入对象中缺少sample_id。"
   )
 }
 
 message(
-  "07d输入细胞数：",
+  "10输入细胞数：",
   ncol(sc)
 )
 
 # ============================================================
-# C. 基于07c marker审查的cluster决策表
+# D. 基于内部marker审查的cluster决策表
 # ============================================================
+
+# manual_cluster_review记录每个内部cluster的保留或排除决定。
+#
+# Retain_epithelial_core：
+# 保留为上皮核心细胞。
+#
+# Exclude_lineage_ambiguous：
+# 排除lineage-ambiguous或混合信号细胞。
+#
+# Exclude_stromal_or_myeloid_like、Exclude_CAF_stromal_like、
+# Exclude_T_cell_like、Exclude_macrophage_like：
+# 排除非上皮谱系信号明显的内部cluster。
 
 manual_cluster_review <- data.frame(
   internal_cluster = c(
@@ -190,7 +213,7 @@ write.csv(
   manual_cluster_review,
   file.path(
     table_dir,
-    "07d_manual_review_cluster_decision.csv"
+    "10_manual_review_cluster_decision.csv"
   ),
   row.names = FALSE
 )
@@ -206,10 +229,10 @@ message(
 )
 
 # ============================================================
-# D. 写入审查状态，并输出筛选概览
+# E. 写入审查状态并输出筛选概览
 # ============================================================
 
-sc$internal_cluster_07c <- as.character(
+sc$internal_cluster_10_input <- as.character(
   sc$seurat_clusters
 )
 
@@ -220,7 +243,7 @@ decision_map <- setNames(
 
 sc$manual_review_status <- unname(
   decision_map[
-    sc$internal_cluster_07c
+    sc$internal_cluster_10_input
   ]
 )
 
@@ -238,30 +261,30 @@ sc$manual_review_status <- factor(
 
 review_summary <- sc@meta.data %>%
   mutate(
-    internal_cluster_07c = as.character(
-      internal_cluster_07c
+    internal_cluster_10_input = as.character(
+      internal_cluster_10_input
     )
   ) %>%
   count(
-    internal_cluster_07c,
+    internal_cluster_10_input,
     manual_review_status,
     name = "cell_number"
   ) %>%
   left_join(
     manual_cluster_review,
     by = c(
-      "internal_cluster_07c" = "internal_cluster"
+      "internal_cluster_10_input" = "internal_cluster"
     )
   ) %>%
   mutate(
-    percent_of_all_07c_cells = round(
+    percent_of_all_input_cells = round(
       100 * cell_number / sum(cell_number),
       2
     )
   ) %>%
   arrange(
     suppressWarnings(
-      as.numeric(internal_cluster_07c)
+      as.numeric(internal_cluster_10_input)
     )
   )
 
@@ -269,13 +292,13 @@ write.csv(
   review_summary,
   file.path(
     table_dir,
-    "07d_manual_review_cell_summary.csv"
+    "10_manual_review_cell_summary.csv"
   ),
   row.names = FALSE
 )
 
 # ============================================================
-# E. 在07c现有UMAP上展示保留/排除决策
+# F. 在现有UMAP上展示保留和排除决策
 # ============================================================
 
 p_review_status <- DimPlot(
@@ -287,7 +310,7 @@ p_review_status <- DimPlot(
   raster.dpi = c(600, 600)
 ) +
   ggtitle(
-    "07c internal clusters: manual-review epithelial-core decision"
+    "Internal clusters: manual-review epithelial-core decision"
   ) +
   theme_classic(base_size = 12) +
   theme(
@@ -301,7 +324,7 @@ p_review_status <- DimPlot(
 p_internal_cluster <- DimPlot(
   sc,
   reduction = "umap",
-  group.by = "internal_cluster_07c",
+  group.by = "internal_cluster_10_input",
   label = TRUE,
   repel = TRUE,
   pt.size = 0.3,
@@ -309,7 +332,7 @@ p_internal_cluster <- DimPlot(
   raster.dpi = c(600, 600)
 ) +
   ggtitle(
-    "07c internal cluster identity"
+    "Internal cluster identity"
   ) +
   theme_classic(base_size = 12) +
   theme(
@@ -323,7 +346,7 @@ p_internal_cluster <- DimPlot(
 ggsave(
   filename = file.path(
     figure_dir,
-    "07d_manual_review_cluster_decision_UMAP.pdf"
+    "10_manual_review_cluster_decision_UMAP.pdf"
   ),
   plot = p_review_status +
     p_internal_cluster,
@@ -332,11 +355,11 @@ ggsave(
 )
 
 # ============================================================
-# F. 提取上皮核心集，并重新构建轻量对象
+# G. 提取上皮核心集并重新构建轻量对象
 # ============================================================
 
 retained_cells <- colnames(sc)[
-  sc$internal_cluster_07c %in% retained_clusters
+  sc$internal_cluster_10_input %in% retained_clusters
 ]
 
 if (length(retained_cells) < 100) {
@@ -375,7 +398,7 @@ gc()
 sc_core <- CreateSeuratObject(
   counts = core_counts,
   meta.data = core_metadata,
-  project = "GSE215403_manual_review_epithelial_core"
+  project = "manual_review_epithelial_core"
 )
 
 rm(core_counts)
@@ -384,7 +407,7 @@ gc()
 DefaultAssay(sc_core) <- "RNA"
 
 # ============================================================
-# G. 上皮核心集重新降维与内部聚类
+# H. 上皮核心集重新降维与内部聚类
 # ============================================================
 
 set.seed(1234)
@@ -452,14 +475,12 @@ sc_core$epithelial_core_cluster <- as.character(
 )
 
 # ============================================================
-# H. 相对program score
+# I. 计算相对program score
 # ============================================================
-#
-# 与07c不同：
-# 这里不再比较原始平均表达值。
-# 而是先在上皮核心集内对每个program做z-score标准化，
-# 再比较每个cluster的相对富集程度。
-# ============================================================
+
+# 这里先在上皮核心集内计算每个program的平均表达，
+# 再将每个program score转为z-score。
+# 因此结果表示该program在上皮核心集内部的相对富集程度。
 
 cycling_genes <- c(
   "MKI67", "TOP2A", "CDK1", "CDC20", "CDCA5",
@@ -515,7 +536,7 @@ write.csv(
   program_gene_set_table,
   file.path(
     table_dir,
-    "07d_relative_program_gene_sets_available.csv"
+    "10_relative_program_gene_sets_available.csv"
   ),
   row.names = FALSE
 )
@@ -591,7 +612,7 @@ relative_score_columns <- paste0(
 )
 
 # ============================================================
-# I. 以内部cluster为单位计算相对program富集
+# J. 以内部cluster为单位计算相对program富集
 # ============================================================
 
 core_cluster_program_scores <- sc_core@meta.data %>%
@@ -697,7 +718,7 @@ write.csv(
   core_cluster_program_summary,
   file.path(
     table_dir,
-    "07d_epithelial_core_relative_program_summary.csv"
+    "10_epithelial_core_relative_program_summary.csv"
   ),
   row.names = FALSE
 )
@@ -726,7 +747,7 @@ sc_core$relative_program_label <- factor(
 )
 
 # ============================================================
-# J. 上皮核心集组成表
+# K. 输出上皮核心集组成表
 # ============================================================
 
 core_by_sample_cluster <- sc_core@meta.data %>%
@@ -762,13 +783,13 @@ write.csv(
   core_by_sample_cluster,
   file.path(
     table_dir,
-    "07d_epithelial_core_by_sample_cluster_and_program.csv"
+    "10_epithelial_core_by_sample_cluster_and_program.csv"
   ),
   row.names = FALSE
 )
 
 # ============================================================
-# K. 图：上皮核心集UMAP
+# L. 图：上皮核心集UMAP
 # ============================================================
 
 p_core_sample <- DimPlot(
@@ -836,7 +857,7 @@ p_core_program <- DimPlot(
 ggsave(
   filename = file.path(
     figure_dir,
-    "07d_epithelial_core_UMAP_sample_cluster_program.pdf"
+    "10_epithelial_core_UMAP_sample_cluster_program.pdf"
   ),
   plot = p_core_sample +
     p_core_cluster +
@@ -847,7 +868,7 @@ ggsave(
 )
 
 # ============================================================
-# L. 图：相对program score UMAP
+# M. 图：相对program score UMAP
 # ============================================================
 
 p_relative_program_scores <- FeaturePlot(
@@ -866,7 +887,7 @@ p_relative_program_scores <- FeaturePlot(
 ggsave(
   filename = file.path(
     figure_dir,
-    "07d_epithelial_core_relative_program_scores_UMAP.pdf"
+    "10_epithelial_core_relative_program_scores_UMAP.pdf"
   ),
   plot = p_relative_program_scores,
   width = 13,
@@ -874,7 +895,7 @@ ggsave(
 )
 
 # ============================================================
-# M. 核心基因表达
+# N. 核心基因表达图
 # ============================================================
 
 core_genes <- intersect(
@@ -914,7 +935,7 @@ p_core_genes_by_program <- DotPlot(
 ggsave(
   filename = file.path(
     figure_dir,
-    "07d_core_gene_expression_by_epithelial_core_state.pdf"
+    "10_core_gene_expression_by_epithelial_core_state.pdf"
   ),
   plot = p_core_genes_by_cluster +
     p_core_genes_by_program,
@@ -923,7 +944,7 @@ ggsave(
 )
 
 # ============================================================
-# N. Sample × cluster × core gene汇总
+# O. 输出sample×cluster×core gene汇总表
 # ============================================================
 
 core_expression <- FetchData(
@@ -969,13 +990,13 @@ write.csv(
   core_expression_summary,
   file.path(
     table_dir,
-    "07d_core_gene_expression_by_sample_cluster_and_program.csv"
+    "10_core_gene_expression_by_sample_cluster_and_program.csv"
   ),
   row.names = FALSE
 )
 
 # ============================================================
-# O. 保存对象与运行信息
+# P. 保存对象和环境信息
 # ============================================================
 
 sc_core$analysis_stage <- "manual_review_epithelial_core_complete"
@@ -984,7 +1005,7 @@ saveRDS(
   sc_core,
   file.path(
     object_dir,
-    "07d_GSE215403_manual_review_epithelial_core.rds"
+    "10_manual_review_epithelial_core.rds"
   )
 )
 
@@ -992,19 +1013,26 @@ writeLines(
   capture.output(sessionInfo()),
   con = file.path(
     table_dir,
-    "07d_sessionInfo.txt"
+    "10_sessionInfo.txt"
   )
 )
 
+# ============================================================
+# Q. 最终提示
+# ============================================================
+
 message("\n============================================================")
-message("07d_manual_review_epithelial_core_local.R运行完成。")
+message("10_manual_review_epithelial_core.R运行完成。")
 message("")
-message("重点查看：")
-message("1. results/figures/07d_manual_review_cluster_decision_UMAP.pdf")
-message("2. results/figures/07d_epithelial_core_UMAP_sample_cluster_program.pdf")
-message("3. results/figures/07d_epithelial_core_relative_program_scores_UMAP.pdf")
-message("4. results/figures/07d_core_gene_expression_by_epithelial_core_state.pdf")
-message("5. results/tables/07d_manual_review_cell_summary.csv")
-message("6. results/tables/07d_epithelial_core_relative_program_summary.csv")
-message("7. results/tables/07d_epithelial_core_by_sample_cluster_and_program.csv")
+message("已保存对象：")
+message("results/objects/10_manual_review_epithelial_core.rds")
+message("")
+message("请重点查看：")
+message("1. results/figures/10_manual_review_cluster_decision_UMAP.pdf")
+message("2. results/figures/10_epithelial_core_UMAP_sample_cluster_program.pdf")
+message("3. results/figures/10_epithelial_core_relative_program_scores_UMAP.pdf")
+message("4. results/figures/10_core_gene_expression_by_epithelial_core_state.pdf")
+message("5. results/tables/10_manual_review_cell_summary.csv")
+message("6. results/tables/10_epithelial_core_relative_program_summary.csv")
+message("7. results/tables/10_epithelial_core_by_sample_cluster_and_program.csv")
 message("============================================================\n")

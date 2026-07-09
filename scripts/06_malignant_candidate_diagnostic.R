@@ -1,28 +1,37 @@
-# ============================================================
-#
-# 功能：
-# 1. 读取 05c 人工注释对象
-# 2. 定义 tumor epithelial candidate、salivary epithelial reference
-# 3. 不复制 Seurat 子对象，避免本地内存问题
-# 4. 汇总 SASH1 / MYH11 / EMP1 / COL1A1 的表达
-# 5. 输出后续 CNV / malignant call 所需的诊断表和图
-#
-# 注意：
-# 最终恶性判定需要后续 CNV 或其他证据支持。
-# ============================================================
+# 06_malignant_candidate_diagnostic.R
 
-# ============================================================
-# 用户配置说明
-# ============================================================
-# 运行前请检查以下设置：
-# 1. project_dir：项目根目录。
-# 2. raw_dir：原始数据目录。
-# 3. object_dir：RDS对象输出目录。
-# 4. table_dir：CSV和TXT结果输出目录。
-# 5. figure_dir：PDF图输出目录。
-# 6. 输入文件名：若本地文件名不同，请在对应input_file处修改。
-# 7. 线程数、内存和运行位置：CopyKAT、Seurat聚类和Monocle3建议在服务器或高内存本地环境运行。
-# ============================================================
+# 本脚本功能：
+# 1. 读取05人工注释后的Seurat object
+# 2. 定义tumor epithelial candidate clusters
+# 3. 定义salivary epithelial reference cluster
+# 4. 写入malignant_status_diagnostic初步诊断标签
+# 5. 汇总candidate和reference群的细胞数与样本组成
+# 6. 汇总SASH1、MYH11、EMP1、COL1A1的表达
+# 7. 输出target gene和diagnostic marker图表
+# 8. 保存供后续CopyKAT和final malignant call使用的对象
+
+# 本项目专用数据：
+# GSE215403
+# 12个OSCC单细胞样本：
+# OSCC, scB1, scB2, scB5, scB7, scB8,
+# scB9, scB10, scB12, scB13, scB14, scB15
+#
+# 本脚本定义的是tumor epithelial candidate和reference。
+# 最终malignant/non-malignant判定不在本脚本完成。
+# 后续步骤会结合CopyKAT inferred CNV和marker evidence进一步确认。
+#
+# 通用代码修改位置：
+# 1. 换数据集时：
+#    修改input_object_file和cluster_column
+#
+# 2. 换聚类分辨率时：
+#    修改cluster_column
+#
+# 3. 换candidate/reference定义时：
+#    修改tumor_candidate_clusters和salivary_reference_clusters
+#
+# 4. 换关注基因或诊断marker时：
+#    修改target_genes、epithelial_markers、salivary_markers和tumor_state_markers
 
 
 # ============================================================
@@ -57,7 +66,7 @@ library(ggplot2)
 library(patchwork)
 
 # ============================================================
-# B. 项目路径
+# B. 项目路径与文件夹
 # ============================================================
 
 project_dir <- getwd()
@@ -85,34 +94,21 @@ dir.create(table_dir, recursive = TRUE, showWarnings = FALSE)
 dir.create(figure_dir, recursive = TRUE, showWarnings = FALSE)
 
 # ============================================================
-# C. 读取 05c 对象
+# C. 读取05对象
 # ============================================================
 
-plot_ready_file <- file.path(
+input_object_file <- file.path(
   object_dir,
-  "05c_GSE215403_manual_annotated_plot_ready.rds"
+  "05_manual_annotated_before_malignant_call.rds"
 )
 
-base_file <- file.path(
-  object_dir,
-  "05c_GSE215403_manual_annotated_before_malignant_call.rds"
-)
-
-input_candidates <- c(
-  plot_ready_file,
-  base_file
-)
-
-input_object_file <- input_candidates[
-  file.exists(input_candidates)
-][1]
-
-if (is.na(input_object_file)) {
+if (!file.exists(input_object_file)) {
   
   stop(
     paste0(
-      "找不到 05c 对象。\n",
-      "请先运行 05c_manual_annotation_and_target_gene_summary.R"
+      "找不到05对象：\n",
+      input_object_file,
+      "\n请先运行05_manual_annotation_and_target_gene_summary.R"
     )
   )
 }
@@ -138,7 +134,7 @@ if (length(missing_metadata) > 0) {
   
   stop(
     paste0(
-      "缺少 metadata 列：",
+      "缺少metadata列：",
       paste(missing_metadata, collapse = ", ")
     )
   )
@@ -148,22 +144,21 @@ message("读取完成。")
 message("当前细胞数：", ncol(sc))
 
 # ============================================================
-# D. 定义 malignant candidate 与 epithelial reference
+# D. 定义tumor candidate和epithelial reference
 # ============================================================
+
+# 基于05的人工annotation和marker诊断结果：
 #
-# 基于 05b / 05c 的人工 marker 注释：
+# 2=Differentiated epithelial tumor candidate
+# 3=Cycling epithelial tumor candidate
+# 4=Cancer-testis epithelial tumor candidate
+# 6=Epithelial tumor candidate
+# 11=Epithelial tumor candidate
 #
-# 2  = Differentiated epithelial tumor candidate
-# 3  = Cycling epithelial tumor candidate
-# 4  = Cancer-testis epithelial tumor candidate
-# 6  = Epithelial tumor candidate
-# 11 = Epithelial tumor candidate
+# 15=Salivary epithelial normal-like
 #
-# 15 = Salivary epithelial normal-like
-#
-# 通用项目：
-# 换数据集时，这一段 cluster 编号必须重新判断，
-# ============================================================
+# 这里的tumor candidate仍是候选标签。
+# 后续需要CopyKAT inferred CNV结果进一步支持。
 
 tumor_candidate_clusters <- c(
   "2",
@@ -208,7 +203,7 @@ names(diagnostic_status) <- colnames(sc)
 sc[["malignant_status_diagnostic"]] <- diagnostic_status
 
 # ============================================================
-# E. 输出 candidate 群细胞数与样本组成
+# E. 输出candidate细胞数与样本组成
 # ============================================================
 
 candidate_summary <- sc@meta.data %>%
@@ -239,7 +234,7 @@ write.csv(
   candidate_summary,
   file.path(
     table_dir,
-    "06b_malignant_candidate_cluster_summary.csv"
+    "06_malignant_candidate_cluster_summary.csv"
   ),
   row.names = FALSE
 )
@@ -280,7 +275,7 @@ write.csv(
   candidate_by_sample,
   file.path(
     table_dir,
-    "06b_malignant_candidate_by_sample.csv"
+    "06_malignant_candidate_by_sample.csv"
   ),
   row.names = FALSE
 )
@@ -288,7 +283,7 @@ write.csv(
 print(candidate_summary)
 
 # ============================================================
-# F. 诊断状态 UMAP
+# F. 诊断状态UMAP
 # ============================================================
 
 diagnostic_colors <- c(
@@ -319,7 +314,7 @@ p_diagnostic_umap <- DimPlot(
 ggsave(
   filename = file.path(
     figure_dir,
-    "06b_tumor_candidate_and_salivary_reference_UMAP.pdf"
+    "06_tumor_candidate_and_salivary_reference_UMAP.pdf"
   ),
   plot = p_diagnostic_umap,
   width = 12,
@@ -329,7 +324,7 @@ ggsave(
 ggsave(
   filename = file.path(
     figure_dir,
-    "06b_tumor_candidate_and_salivary_reference_UMAP.png"
+    "06_tumor_candidate_and_salivary_reference_UMAP.png"
   ),
   plot = p_diagnostic_umap,
   width = 12,
@@ -340,15 +335,20 @@ ggsave(
 # ============================================================
 # G. 定义诊断基因
 # ============================================================
-#
+
 # target_genes：
-# 论文中的四个核心基因。
+# 论文主线关注的4个核心基因。
 #
-# epithelial / salivary / tumor-state marker：
-# 用于确认 candidate 与 normal-like reference 的身份。
+# epithelial_markers：
+# 辅助确认上皮身份。
 #
-# 这些 marker 用于诊断，不直接构成最终 CNV 判定。
-# ============================================================
+# salivary_markers：
+# 辅助确认salivary/normal-like epithelial reference。
+#
+# tumor_state_markers：
+# 辅助确认cycling、cancer-testis和分化上皮肿瘤状态。
+#
+# 这些marker用于诊断展示，不直接构成最终CNV判定。
 
 target_genes <- c(
   "SASH1",
@@ -414,7 +414,7 @@ write.csv(
   ),
   file.path(
     table_dir,
-    "06b_diagnostic_gene_check.csv"
+    "06_diagnostic_gene_check.csv"
   ),
   row.names = FALSE
 )
@@ -422,10 +422,8 @@ write.csv(
 # ============================================================
 # H. 提取表达数据
 # ============================================================
-#
-# 这里只提取少量 marker 和 metadata，
-# 本地内存负担较低。
-# ============================================================
+
+# 这里只提取少量marker和metadata，避免复制完整表达矩阵。
 
 expression_data <- FetchData(
   object = sc,
@@ -454,13 +452,12 @@ expression_long <- expression_data %>%
   )
 
 # ============================================================
-# I. 四个核心基因：按诊断状态汇总
+# I. 核心基因按诊断状态汇总
 # ============================================================
-#
-#
-# 真正统计比较时要按 sample 做 pseudobulk，
-# 避免把每个细胞都当独立生物学重复。
-# ============================================================
+
+# 本表按diagnostic status汇总4个核心基因表达。
+# 该表用于描述性比较。
+# 更严格的统计比较应基于sample-aware pseudobulk表。
 
 target_by_status <- expression_long %>%
   filter(
@@ -485,7 +482,7 @@ write.csv(
   target_by_status,
   file.path(
     table_dir,
-    "06b_target_gene_expression_by_diagnostic_status.csv"
+    "06_target_gene_expression_by_diagnostic_status.csv"
   ),
   row.names = FALSE
 )
@@ -493,12 +490,12 @@ write.csv(
 print(target_by_status)
 
 # ============================================================
-# J. 四个核心基因：sample-aware pseudobulk 汇总
+# J. 核心基因sample-aware pseudobulk汇总
 # ============================================================
-#
-# 每个 sample × status × gene 得到一个平均表达值。
-# 后续若做统计检验，应基于这张表，而非逐细胞检验。
-# ============================================================
+
+# 每个sample×status×gene得到一个平均表达值。
+# 后续如果做统计检验，应优先基于这张表，
+# 避免把每个细胞都当作独立生物学重复。
 
 target_by_sample <- expression_long %>%
   filter(
@@ -525,13 +522,13 @@ write.csv(
   target_by_sample,
   file.path(
     table_dir,
-    "06b_target_gene_pseudobulk_by_sample.csv"
+    "06_target_gene_pseudobulk_by_sample.csv"
   ),
   row.names = FALSE
 )
 
 # ============================================================
-# K. 目标基因 DotPlot 与 violin plot
+# K. 目标基因DotPlot与VlnPlot
 # ============================================================
 
 p_target_dotplot <- DotPlot(
@@ -548,7 +545,7 @@ p_target_dotplot <- DotPlot(
 ggsave(
   filename = file.path(
     figure_dir,
-    "06b_target_genes_DotPlot_by_diagnostic_status.pdf"
+    "06_target_genes_DotPlot_by_diagnostic_status.pdf"
   ),
   plot = p_target_dotplot,
   width = 12,
@@ -572,7 +569,7 @@ p_target_violin <- VlnPlot(
 ggsave(
   filename = file.path(
     figure_dir,
-    "06b_target_genes_VlnPlot_by_diagnostic_status.pdf"
+    "06_target_genes_VlnPlot_by_diagnostic_status.pdf"
   ),
   plot = p_target_violin,
   width = 14,
@@ -580,7 +577,7 @@ ggsave(
 )
 
 # ============================================================
-# L. 关键诊断 marker DotPlot
+# L. 关键诊断marker DotPlot
 # ============================================================
 
 marker_dotplot_genes <- intersect(
@@ -606,7 +603,7 @@ p_marker_dotplot <- DotPlot(
 ggsave(
   filename = file.path(
     figure_dir,
-    "06b_epithelial_salivary_tumor_marker_DotPlot.pdf"
+    "06_epithelial_salivary_tumor_marker_DotPlot.pdf"
   ),
   plot = p_marker_dotplot,
   width = 18,
@@ -614,7 +611,7 @@ ggsave(
 )
 
 # ============================================================
-# M. 保存诊断对象
+# M. 保存诊断对象和环境信息
 # ============================================================
 
 sc$analysis_stage <- "malignant_candidate_diagnostic_before_CNV"
@@ -623,7 +620,7 @@ saveRDS(
   sc,
   file.path(
     object_dir,
-    "06b_GSE215403_malignant_candidate_diagnostic.rds"
+    "06_malignant_candidate_diagnostic.rds"
   )
 )
 
@@ -631,25 +628,25 @@ writeLines(
   capture.output(sessionInfo()),
   con = file.path(
     table_dir,
-    "06b_sessionInfo.txt"
+    "06_sessionInfo.txt"
   )
 )
 
 # ============================================================
-# N. 完成提示
+# N. 最终提示
 # ============================================================
 
 message("\n============================================================")
-message("06b_malignant_candidate_diagnostic.R 运行完成。")
+message("06_malignant_candidate_diagnostic.R 运行完成。")
 message("")
 message("已保存对象：")
-message("results/objects/06b_GSE215403_malignant_candidate_diagnostic.rds")
+message("results/objects/06_malignant_candidate_diagnostic.rds")
 message("")
-message("重点查看：")
-message("1. results/figures/06b_tumor_candidate_and_salivary_reference_UMAP.pdf")
-message("2. results/figures/06b_target_genes_DotPlot_by_diagnostic_status.pdf")
-message("3. results/figures/06b_target_genes_VlnPlot_by_diagnostic_status.pdf")
-message("4. results/figures/06b_epithelial_salivary_tumor_marker_DotPlot.pdf")
-message("5. results/tables/06b_target_gene_expression_by_diagnostic_status.csv")
-message("6. results/tables/06b_target_gene_pseudobulk_by_sample.csv")
+message("请重点查看：")
+message("1. results/figures/06_tumor_candidate_and_salivary_reference_UMAP.pdf")
+message("2. results/figures/06_target_genes_DotPlot_by_diagnostic_status.pdf")
+message("3. results/figures/06_target_genes_VlnPlot_by_diagnostic_status.pdf")
+message("4. results/figures/06_epithelial_salivary_tumor_marker_DotPlot.pdf")
+message("5. results/tables/06_target_gene_expression_by_diagnostic_status.csv")
+message("6. results/tables/06_target_gene_pseudobulk_by_sample.csv")
 message("============================================================\n")

@@ -1,18 +1,5 @@
-# ============================================================
-# 用户配置说明
-# ============================================================
-# 运行前请检查以下设置：
-# 1. project_dir：项目根目录。
-# 2. raw_dir：原始数据目录。
-# 3. object_dir：RDS对象输出目录。
-# 4. table_dir：CSV和TXT结果输出目录。
-# 5. figure_dir：PDF图输出目录。
-# 6. 输入文件名：若本地文件名不同，请在对应input_file处修改。
-# 7. 线程数、内存和运行位置：CopyKAT、Seurat聚类和Monocle3建议在服务器或高内存本地环境运行。
-# ============================================================
-
 # 01_download_and_prepare_scRNA.R
-#
+
 # 本脚本功能：
 # 1. 建立项目文件夹
 # 2. 安装后续分析需要的核心R包
@@ -20,7 +7,7 @@
 # 4. 解压GEO RAW.tar文件
 # 5. 将散装的GEO 10x文件整理为标准Read10X()文件夹
 # 6. 输出每个样本的文件完整性检查表
-#
+
 # 本项目专用数据：
 # GSE215403
 # 12个OSCC单细胞样本：
@@ -33,10 +20,12 @@
 #
 # 2. 换GEO文件命名规则时：
 #    修改filename_pattern
-#
+
+
+# ============================================================
+# A. 项目路径与文件夹
 # ============================================================
 
-# A. 项目路径与文件夹
 # getwd()应当是你的R Project根目录，可以换成本项目文件夹。
 # 我现在的项目路径应为：
 # /Users/yaoshuo/Desktop/HNSCC_SASH1_reproduction
@@ -86,7 +75,6 @@ script_dir <- file.path(
 )
 
 # 自动建立需要的文件夹。
-
 dir.create(raw_dir, recursive = TRUE, showWarnings = FALSE)
 dir.create(processed_dir, recursive = TRUE, showWarnings = FALSE)
 dir.create(table_dir, recursive = TRUE, showWarnings = FALSE)
@@ -95,41 +83,38 @@ dir.create(figure_dir, recursive = TRUE, showWarnings = FALSE)
 dir.create(config_dir, recursive = TRUE, showWarnings = FALSE)
 dir.create(script_dir, recursive = TRUE, showWarnings = FALSE)
 
-# B. 安装与检查 R 包
+# ============================================================
+# B. 安装与检查R包
+# ============================================================
 
-# 设置 CRAN 下载镜像。
-# 只影响 install.packages() 从哪里下载，不影响分析结果。
-
+# 设置CRAN下载镜像。
+# 只影响install.packages()从哪里下载，不影响分析结果。
 options(repos = c(CRAN = "https://cloud.r-project.org"))
 
 # 设置下载超时。
-# GEO 大文件或安装大型 R 包时，避免默认超时过短。
-
+# GEO大文件或安装大型R包时，避免默认超时过短。
 options(timeout = 3600)
 
 # -----------------------------
-# B1. 安装 BiocManager
+# B1. 安装BiocManager
 # -----------------------------
-#
-# BiocManager 用于后续安装 Bioconductor 包。
+
+# BiocManager用于后续安装Bioconductor包。
 # 例如：
 # scDblFinder、clusterProfiler、org.Hs.eg.db、
-# SingleCellExperiment、monocle3 等。
+# SingleCellExperiment、monocle3等。
 #
-# 目前这一步不强制安装所有 Bioconductor 包，
+# 目前这一步不强制安装所有Bioconductor包，
 # 因为它们依赖多、体积大，等后续真正用到时再装。
-#
-# 你的 R 版本是 4.5.0，对应 Bioconductor 3.22。
-# 这是官方匹配版本。
 
 if (!requireNamespace("BiocManager", quietly = TRUE)) {
   install.packages("BiocManager")
 }
 
 # -----------------------------
-# B2. 安装核心 CRAN 包
+# B2. 安装核心CRAN包
 # -----------------------------
-#
+
 # 这些包后续一定会用到，因此一次装好。
 #
 # Seurat：
@@ -138,13 +123,13 @@ if (!requireNamespace("BiocManager", quietly = TRUE)) {
 # harmony：
 # 多样本整合与批次校正
 #
-# dplyr / tidyr / stringr：
+# dplyr/tidyr/stringr：
 # 数据整理
 #
 # fs：
 # 文件夹与文件操作
 #
-# ggplot2 / patchwork / cowplot：
+# ggplot2/patchwork/cowplot：
 # 绘图与拼图
 #
 # Matrix：
@@ -178,18 +163,14 @@ cran_packages <- c(
 )
 
 for (pkg in cran_packages) {
-  
   if (!requireNamespace(pkg, quietly = TRUE)) {
-    
     message("正在安装 R 包：", pkg)
-    
     install.packages(pkg)
-    
   } else {
-    
     message("已安装，跳过：", pkg)
   }
 }
+
 
 # -----------------------------
 # B3. 检查关键包
@@ -216,30 +197,29 @@ write.csv(
   row.names = FALSE
 )
 
-# 加载本脚本后面实际会使用的包
+# 加载本脚本后面实际会使用的包。
 library(dplyr)
 library(tidyr)
 library(stringr)
 
 # ============================================================
-# C. 下载 GSE215403 原始数据
+# C. 下载GSE215403原始数据
 # ============================================================
 
-# 本课题专用 GEO 编号。
+# 本课题专用GEO编号。
 # 换数据集时改这里。
 
 gse_id <- "GSE215403"
 
-# GEO 的补充文件下载地址。
-# GSE215403_RAW.tar 大小约 268.5 MB。
+# GEO补充文件下载地址。
+# GSE215403_RAW.tar大小约268.5MB。
 #
 # 通用替换提示：
-# 不同 GSE 的路径层级通常是：
-# GSE215nnn / GSE215403
+# 不同GSE的路径层级通常是：
+# GSE215nnn/GSE215403
 #
-# 例如 GSE123456 通常可能位于：
+# 例如GSE123456通常可能位于：
 # GSE123nnn/GSE123456
-#
 
 raw_tar_url <- paste0(
   "https://ftp.ncbi.nlm.nih.gov/geo/series/GSE215nnn/",
@@ -257,17 +237,11 @@ raw_tar_file <- file.path(
 # -----------------------------
 # C1. 下载逻辑
 # -----------------------------
-#
-# 你已经下载成功，因此这一步再次运行时应该显示：
-# 检测到文件已存在，跳过下载
-#
-# 若以后换新电脑或删掉 RAW.tar，
-# 才会真正执行 download.file()。
-#
+
 # 注意：
-# NCBI 有时网络较慢。
-# 如果 R 下载反复中断，优先浏览器或 Terminal curl 下载，
-# 然后放进 raw_dir 即可。
+# NCBI有时网络较慢。
+# 如果R下载反复中断，优先用浏览器或Terminal curl下载，
+# 然后放进raw_dir即可。
 
 if (!file.exists(raw_tar_file)) {
   
@@ -291,9 +265,9 @@ if (!file.exists(raw_tar_file)) {
 # -----------------------------
 # C2. 检查下载文件大小
 # -----------------------------
-#
-# 正常约为 268.5 MB。
-# 若只有几 KB、几 MB，通常说明下载不完整。
+
+# 正常约为268.5MB。
+# 若只有几KB、几MB，通常说明下载不完整。
 
 tar_size_mb <- file.info(raw_tar_file)$size / 1024^2
 
@@ -311,11 +285,11 @@ if (is.na(tar_size_mb) || tar_size_mb < 200) {
 }
 
 # ============================================================
-# D. 解压 GSE215403_RAW.tar
+# D. 解压GSE215403_RAW.tar
 # ============================================================
 
-# GEO 解压后得到 36 个文件：
-# 12 个样本 × 3 个文件
+# GEO解压后得到36个文件：
+# 12个样本×3个文件
 #
 # 每个样本有：
 # - barcodes.tsv.gz
@@ -330,18 +304,13 @@ raw_expression_files <- list.files(
 )
 
 if (length(raw_expression_files) == 0) {
-  
   message("开始解压 RAW.tar：")
-  
   utils::untar(
     tarfile = raw_tar_file,
     exdir = processed_dir
   )
-  
   message("解压完成。")
-  
 } else {
-  
   message("检测到已解压的表达矩阵文件，跳过解压。")
 }
 
@@ -365,7 +334,7 @@ write.csv(
   file_table,
   file.path(
     table_dir,
-    "GSE215403_raw_file_list.csv"
+    "01_raw_file_list.csv"
   ),
   row.names = FALSE
 )
@@ -373,14 +342,13 @@ write.csv(
 message("解压后的原始文件数：", nrow(file_table))
 
 # ============================================================
-# E. 识别样本与建立标准 10x 文件夹
+# E. 识别样本与建立标准10x文件夹
 # ============================================================
 
-# 本课题的 12 个原始样本 ID。
+# 本课题的12个原始样本ID。
 #
-# 不把它们改写成 P1-P12。
-# 直接保留 GEO 原始 sample ID，
-# 后面作为 Seurat metadata 中的 sample_id 使用。
+# 直接保留GEO原始sampleID，
+# 后面作为Seurat metadata中的sample_id使用。
 
 expected_samples <- c(
   "OSCC",
@@ -398,9 +366,9 @@ expected_samples <- c(
 )
 
 # -----------------------------
-# E1. 解析 GEO 原始文件名
+# E1. 解析GEO原始文件名
 # -----------------------------
-#
+
 # 本数据集文件名规则：
 #
 # GSM6634869_OSCC_barcodes.tsv.gz
@@ -410,16 +378,16 @@ expected_samples <- c(
 # 正则表达式含义：
 #
 # ^GSM\\d+_
-# 文件以 GSM编号_ 开头
+# 文件以GSM编号_开头
 #
 # (.+?)
-# 提取中间的样本名，例如 OSCC 或 scB1
+# 提取中间的样本名，例如OSCC或scB1
 #
 # (barcodes...|features...|matrix...)
 # 提取文件类型
 #
 # 通用修改位置：
-# 换 GEO 数据集时，最有可能需要改这里的 filename_pattern。
+# 换GEO数据集时，最有可能需要改这里的filename_pattern。
 
 filename_pattern <- paste0(
   "^GSM\\d+_(.+?)_",
@@ -460,7 +428,7 @@ write.csv(
   sample_check,
   file.path(
     table_dir,
-    "GSE215403_raw_sample_file_check.csv"
+    "01_raw_sample_file_check.csv"
   ),
   row.names = FALSE
 )
@@ -478,16 +446,16 @@ if (!setequal(expected_samples, detected_samples)) {
   
   stop(
     paste0(
-      "检测到的样本 ID 与预期不一致。\n",
-      "请查看：results/tables/GSE215403_raw_sample_file_check.csv"
+      "检测到的样本ID与预期不一致。\n",
+      "请查看：results/tables/01_raw_sample_file_check.csv"
     )
   )
 }
 
 # -----------------------------
-# E4. 建立标准 10x 文件夹
+# E4. 建立标准10x文件夹
 # -----------------------------
-#
+
 # 最终结构：
 #
 # data/processed/scRNA_GSE215403/10x_by_sample/
@@ -509,8 +477,7 @@ tenx_root <- file.path(
   "10x_by_sample"
 )
 
-# 为保证可以重复运行：
-#
+# 为保证可以重复运行，每次重新建立标准10x文件夹。
 
 if (dir.exists(tenx_root)) {
   unlink(
@@ -527,7 +494,7 @@ dir.create(
 )
 
 # -----------------------------
-# E5. 复制每个样本的 3 个文件
+# E5. 复制每个样本的3个文件
 # -----------------------------
 
 for (sid in expected_samples) {
@@ -576,8 +543,8 @@ for (sid in expected_samples) {
     showWarnings = FALSE
   )
   
-  # 统一标准 10x 文件名。
-  # Read10X() 才能直接识别。
+  # 统一标准10x文件名。
+  # Read10X()才能直接识别。
   
   file.copy(
     matrix_file,
@@ -601,7 +568,7 @@ for (sid in expected_samples) {
 }
 
 # -----------------------------
-# E6. 最终检查 12 个样本文件夹
+# E6. 最终检查12个样本文件夹
 # -----------------------------
 
 final_check <- lapply(expected_samples, function(sid) {
@@ -632,21 +599,21 @@ write.csv(
   final_check,
   file.path(
     table_dir,
-    "GSE215403_10x_folder_check.csv"
+    "01_10x_folder_check.csv"
   ),
   row.names = FALSE
 )
 
 # -----------------------------
-# E7. 保存基础样本 metadata
+# E7. 保存基础样本metadata
 # -----------------------------
-#
+
 # 目前只记录：
 # sample_id、数据集、疾病
 #
-# 后面拿到 patient clinical metadata 后，
-# 可以在这个 csv 里补充：
-# stage、sex、age、site、treatment 等列。
+# 后面拿到patient clinical metadata后，
+# 可以在这个csv里补充：
+# stage、sex、age、site、treatment等列。
 
 sample_metadata <- data.frame(
   sample_id = expected_samples,
@@ -672,7 +639,7 @@ message("\n============================================================")
 message("01_download_and_prepare_scRNA.R 运行完成。")
 message("下一步可以开始读取 12 个样本并做 QC。")
 message("请重点确认以下文件：")
-message("1. results/tables/GSE215403_10x_folder_check.csv")
-message("2. results/tables/GSE215403_raw_sample_file_check.csv")
+message("1. results/tables/01_10x_folder_check.csv")
+message("2. results/tables/01_raw_sample_file_check.csv")
 message("3. config/GSE215403_sample_metadata.csv")
 message("============================================================\n")

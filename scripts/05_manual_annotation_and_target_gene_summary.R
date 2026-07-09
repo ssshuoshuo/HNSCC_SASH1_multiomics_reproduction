@@ -1,32 +1,38 @@
-# ============================================================
-# 05c_manual_annotation_and_target_gene_summary.R
-#
-# 目标：
-# 1. 在 05b 诊断基础上写入人工 major cell-type annotation
-# 2. 生成论文式 major-cell-type UMAP
-# 3. 计算 SASH1 / MYH11 / EMP1 / COL1A1
-#    在 cluster 与 cell type 层面的表达汇总
-# 4. 生成 DotPlot、VlnPlot 和目标基因表达表
-# 5. 保存供 malignant-call 和 Monocle3 使用的对象
-#
-# - inferCNV / CopyKAT
-# - malignant 最终判定
-# - 拟时序
-#
-# ============================================================
+# 05_manual_annotation_and_target_gene_summary.R
 
-# ============================================================
-# 用户配置说明
-# ============================================================
-# 运行前请检查以下设置：
-# 1. project_dir：项目根目录。
-# 2. raw_dir：原始数据目录。
-# 3. object_dir：RDS对象输出目录。
-# 4. table_dir：CSV和TXT结果输出目录。
-# 5. figure_dir：PDF图输出目录。
-# 6. 输入文件名：若本地文件名不同，请在对应input_file处修改。
-# 7. 线程数、内存和运行位置：CopyKAT、Seurat聚类和Monocle3建议在服务器或高内存本地环境运行。
-# ============================================================
+# 本脚本功能：
+# 1. 读取04标准Seurat分析后的multi-resolution对象
+# 2. 基于cluster_res_0.2写入人工major cell-type annotation
+# 3. 写入初步epithelial status标签
+# 4. 生成cluster和manual cell-type的UMAP图
+# 5. 计算SASH1、MYH11、EMP1、COL1A1在cluster层面的表达汇总
+# 6. 计算SASH1、MYH11、EMP1、COL1A1在manual cell-type层面的表达汇总
+# 7. 输出目标基因DotPlot、VlnPlot和UMAP表达图
+# 8. 保存供后续malignant-call和trajectory分析使用的对象
+
+# 本项目专用数据：
+# GSE215403
+# 12个OSCC单细胞样本：
+# OSCC, scB1, scB2, scB5, scB7, scB8,
+# scB9, scB10, scB12, scB13, scB14, scB15
+#
+# 本脚本只写入major cell-type annotation和初步epithelial status。
+# 最终malignant/non-malignant判定不在本脚本完成。
+# 后续步骤会结合tumor-related epithelial identity和CopyKAT CNV结果
+# 进一步定义恶性细胞候选群。
+#
+# 通用代码修改位置：
+# 1. 换数据集时：
+#    修改input_object_file和cluster_column
+#
+# 2. 换聚类分辨率时：
+#    修改cluster_column和manual_annotation
+#
+# 3. 换细胞类型注释时：
+#    修改manual_annotation
+#
+# 4. 换关注基因时：
+#    修改target_genes
 
 
 # ============================================================
@@ -61,7 +67,7 @@ library(ggplot2)
 library(patchwork)
 
 # ============================================================
-# B. 项目路径
+# B. 项目路径与文件夹
 # ============================================================
 
 project_dir <- getwd()
@@ -89,21 +95,21 @@ dir.create(table_dir, recursive = TRUE, showWarnings = FALSE)
 dir.create(figure_dir, recursive = TRUE, showWarnings = FALSE)
 
 # ============================================================
-# C. 读取 05b 对象
+# C. 读取04对象
 # ============================================================
 
 input_object_file <- file.path(
   object_dir,
-  "05b_GSE215403_manual_annotation_diagnostic.rds"
+  "04_standard_Seurat_multi_resolution.rds"
 )
 
 if (!file.exists(input_object_file)) {
   
   stop(
     paste0(
-      "找不到 05b 对象：\n",
+      "找不到04对象：\n",
       input_object_file,
-      "\n请先运行 05b_manual_annotation_diagnostic.R"
+      "\n请先运行04_standard_Seurat_PCA_UMAP_resolution_scan.R"
     )
   )
 }
@@ -115,30 +121,31 @@ DefaultAssay(sc) <- "RNA"
 cluster_column <- "cluster_res_0.2"
 
 if (!cluster_column %in% colnames(sc@meta.data)) {
-  stop("找不到 cluster_res_0.2。")
+  stop("找不到cluster_res_0.2。")
 }
 
 message("读取完成。")
 message("细胞数：", ncol(sc))
 
 # ============================================================
-# D. 人工 annotation map
+# D. 设置人工annotation map
 # ============================================================
+
+# manual_annotation将04得到的Seurat cluster映射为major cell type。
 #
-# 当前 map 基于：
-# 1. 05b top markers
-# 2. major lineage DotPlot
-# 3. FeaturePlot
+# 当前map综合参考：
+# 1. cluster-level top markers
+# 2. canonical lineage marker DotPlot
+# 3. marker FeaturePlot
 # 4. cluster-by-sample composition
 #
-# 通用项目：
-# 最常替换的是这一段。
-#
 # 注意：
-# Epithelial_tumor_candidate 只是“候选恶性上皮”。
-# 最终 malignant / non-malignant 判定会在 06b 用 CNV
-# 和 malignant-marker evidence 再进一步确认。
-# ============================================================
+# Tumor_Epithelial、Differentiated_Tumor等标签在本步骤表示
+# tumor-related epithelial candidate clusters。
+# 它们不是最终malignant-cell calls。
+#
+# 最终恶性细胞判定会在后续步骤中结合CopyKAT inferred CNV、
+# epithelial identity和marker evidence进一步确认。
 
 manual_annotation <- c(
   
@@ -161,7 +168,7 @@ manual_annotation <- c(
 )
 
 # ============================================================
-# E. 检查 annotation 是否覆盖全部 cluster
+# E. 检查annotation是否覆盖全部cluster
 # ============================================================
 
 observed_clusters <- sort(
@@ -187,7 +194,7 @@ if (length(missing_clusters) > 0) {
   
   stop(
     paste0(
-      "annotation map 缺少 cluster：",
+      "annotation map缺少cluster：",
       paste(missing_clusters, collapse = ", ")
     )
   )
@@ -197,14 +204,14 @@ if (length(extra_clusters) > 0) {
   
   warning(
     paste0(
-      "annotation map 中存在当前对象没有的 cluster：",
+      "annotation map中存在当前对象没有的cluster：",
       paste(extra_clusters, collapse = ", ")
     )
   )
 }
 
 # ============================================================
-# F. 写入人工 annotation
+# F. 写入人工annotation
 # ============================================================
 
 cell_cluster <- as.character(
@@ -220,20 +227,20 @@ names(celltype_manual) <- colnames(sc)
 sc[["celltype_manual"]] <- celltype_manual
 
 # ============================================================
-# G. 写入 epithelial status 初步标签
+# G. 写入初步epithelial status标签
 # ============================================================
-#
-# 这里只是为了后续 06b 选择测试细胞与参考细胞。
+
+# epithelial_status_initial用于后续选择tumor-related epithelial candidates
+# 和normal-like epithelial reference。
 #
 # malignant_candidate：
-# 可能恶性，但尚未被 CNV 确认。
+# tumor-related epithelial candidate clusters，尚未经过CNV确认。
 #
 # nonmalignant_epithelial_candidate：
-# 主要用于标识 salivary / normal-like epithelial。
+# normal-like/salivary epithelial candidate。
 #
 # non_epithelial：
-# 免疫、基质、血管等。
-# ============================================================
+# 免疫、基质、血管和其他非上皮细胞。
 
 epithelial_tumor_labels <- c(
   "Differentiated_epithelial_tumor_candidate",
@@ -255,7 +262,7 @@ sc$epithelial_status_initial <- ifelse(
 )
 
 # ============================================================
-# H. 生成 annotation 表
+# H. 输出annotation表
 # ============================================================
 
 annotation_table <- sc@meta.data %>%
@@ -284,7 +291,7 @@ write.csv(
   annotation_table,
   file.path(
     table_dir,
-    "05c_manual_annotation_table_resolution_0.2.csv"
+    "05_manual_annotation_table_resolution_0.2.csv"
   ),
   row.names = FALSE
 )
@@ -292,7 +299,7 @@ write.csv(
 print(annotation_table)
 
 # ============================================================
-# I. Major cell type UMAP
+# I. 输出major cell-type UMAP
 # ============================================================
 
 p_umap_cluster <- DimPlot(
@@ -320,7 +327,7 @@ p_umap_celltype <- DimPlot(
 ggsave(
   filename = file.path(
     figure_dir,
-    "05c_UMAP_cluster_and_manual_celltype.pdf"
+    "05_UMAP_cluster_and_manual_celltype.pdf"
   ),
   plot = p_umap_cluster + p_umap_celltype,
   width = 18,
@@ -330,7 +337,7 @@ ggsave(
 ggsave(
   filename = file.path(
     figure_dir,
-    "05c_UMAP_cluster_and_manual_celltype.png"
+    "05_UMAP_cluster_and_manual_celltype.png"
   ),
   plot = p_umap_cluster + p_umap_celltype,
   width = 18,
@@ -339,7 +346,7 @@ ggsave(
 )
 
 # ============================================================
-# J. 目标基因 cluster / celltype 表达汇总
+# J. 目标基因cluster/celltype表达汇总
 # ============================================================
 
 target_genes <- c(
@@ -411,7 +418,7 @@ write.csv(
   target_by_cluster,
   file.path(
     table_dir,
-    "05c_target_gene_expression_by_cluster.csv"
+    "05_target_gene_expression_by_cluster.csv"
   ),
   row.names = FALSE
 )
@@ -439,13 +446,13 @@ write.csv(
   target_by_celltype,
   file.path(
     table_dir,
-    "05c_target_gene_expression_by_manual_celltype.csv"
+    "05_target_gene_expression_by_manual_celltype.csv"
   ),
   row.names = FALSE
 )
 
 # ============================================================
-# K. 目标基因 DotPlot
+# K. 目标基因DotPlot
 # ============================================================
 
 p_target_dotplot <- DotPlot(
@@ -461,7 +468,7 @@ p_target_dotplot <- DotPlot(
 ggsave(
   filename = file.path(
     figure_dir,
-    "05c_target_genes_DotPlot_by_manual_celltype.pdf"
+    "05_target_genes_DotPlot_by_manual_celltype.pdf"
   ),
   plot = p_target_dotplot,
   width = 14,
@@ -469,7 +476,7 @@ ggsave(
 )
 
 # ============================================================
-# L. 目标基因 VlnPlot
+# L. 目标基因VlnPlot
 # ============================================================
 
 p_target_violin <- VlnPlot(
@@ -483,7 +490,7 @@ p_target_violin <- VlnPlot(
 ggsave(
   filename = file.path(
     figure_dir,
-    "05c_target_genes_VlnPlot_by_manual_celltype.pdf"
+    "05_target_genes_VlnPlot_by_manual_celltype.pdf"
   ),
   plot = p_target_violin,
   width = 18,
@@ -491,16 +498,12 @@ ggsave(
 )
 
 # ============================================================
-# M. 高表达细胞可视化版本
+# M. 目标基因UMAP表达图
 # ============================================================
-#
-# 全局 FeaturePlot 容易让低表达信号显得很淡。
-# 这里通过 min.cutoff = "q05"、max.cutoff = "q95"
-# 改善展示，但不改变原始数据和统计结果。
-#
-# 通用项目：
-# 可改为 q01/q99、q10/q90，或指定数值。
-# ============================================================
+
+# 全局FeaturePlot容易让低表达信号显得很淡。
+# 这里使用min.cutoff="q05"和max.cutoff="q95"改善展示效果。
+# 该设置只影响可视化，不改变原始表达矩阵和统计结果。
 
 p_target_feature_adjusted <- FeaturePlot(
   object = sc,
@@ -517,7 +520,7 @@ p_target_feature_adjusted <- FeaturePlot(
 ggsave(
   filename = file.path(
     figure_dir,
-    "05c_target_genes_UMAP_quantile_scaled.pdf"
+    "05_target_genes_UMAP_quantile_scaled.pdf"
   ),
   plot = p_target_feature_adjusted,
   width = 12,
@@ -525,7 +528,7 @@ ggsave(
 )
 
 # ============================================================
-# N. 保存对象
+# N. 保存对象和环境信息
 # ============================================================
 
 sc$analysis_stage <- "manual_major_annotation_before_malignant_call"
@@ -534,7 +537,7 @@ saveRDS(
   sc,
   file.path(
     object_dir,
-    "05c_GSE215403_manual_annotated_before_malignant_call.rds"
+    "05_manual_annotated_before_malignant_call.rds"
   )
 )
 
@@ -542,25 +545,25 @@ writeLines(
   capture.output(sessionInfo()),
   con = file.path(
     table_dir,
-    "05c_sessionInfo.txt"
+    "05_sessionInfo.txt"
   )
 )
 
 # ============================================================
-# O. 完成提示
+# O. 最终提示
 # ============================================================
 
 message("\n============================================================")
-message("05c_manual_annotation_and_target_gene_summary.R 运行完成。")
+message("05_manual_annotation_and_target_gene_summary.R 运行完成。")
 message("")
 message("已保存对象：")
-message("results/objects/05c_GSE215403_manual_annotated_before_malignant_call.rds")
+message("results/objects/05_manual_annotated_before_malignant_call.rds")
 message("")
-message("重点查看：")
-message("1. results/figures/05c_UMAP_cluster_and_manual_celltype.pdf")
-message("2. results/figures/05c_target_genes_DotPlot_by_manual_celltype.pdf")
-message("3. results/figures/05c_target_genes_VlnPlot_by_manual_celltype.pdf")
-message("4. results/figures/05c_target_genes_UMAP_quantile_scaled.pdf")
-message("5. results/tables/05c_target_gene_expression_by_cluster.csv")
-message("6. results/tables/05c_target_gene_expression_by_manual_celltype.csv")
+message("请重点查看：")
+message("1. results/figures/05_UMAP_cluster_and_manual_celltype.pdf")
+message("2. results/figures/05_target_genes_DotPlot_by_manual_celltype.pdf")
+message("3. results/figures/05_target_genes_VlnPlot_by_manual_celltype.pdf")
+message("4. results/figures/05_target_genes_UMAP_quantile_scaled.pdf")
+message("5. results/tables/05_target_gene_expression_by_cluster.csv")
+message("6. results/tables/05_target_gene_expression_by_manual_celltype.csv")
 message("============================================================\n")

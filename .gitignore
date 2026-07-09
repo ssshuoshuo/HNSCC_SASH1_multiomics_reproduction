@@ -13,5 +13,16 @@ tools/
 scripts_comment_backup/
 scripts_all_local/
 README/
-results/objects/08b_GSE215403_global_trajectory_Seurat.rds
+results/objects/11_global_trajectory_Seurat.rds
 .RDataTmp*
+local_backup_before_renumber_upload/
+
+# temporary local files
+tmp_R/
+local_backup_before_renumber_upload/
+
+# spatial data is still downloading; upload after completion
+data/raw/GSE252265/
+data/raw/spatial_GSE252265/
+scripts_old_not_uploaded/
+results_old_numbered_duplicates_not_uploaded/
