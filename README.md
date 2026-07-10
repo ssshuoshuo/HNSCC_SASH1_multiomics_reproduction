@@ -113,16 +113,38 @@ CopyKAT结果作为辅助证据之一，用于支持恶性细胞群体判断。
 
 ## 大型中间RDS文件说明
 
-以下脚本12–16生成的大型Seurat对象为后续流程可读取的中间文件，建议通过Git LFS保存。
+脚本12–16生成的大型Seurat对象已经通过Git LFS保存。由于GitHub LFS单文件大小限制，部分超过2GB的RDS对象采用分片方式上传。
+
+已作为完整RDS上传的对象：
 
 ```text
 results/objects/12_spatial_tissue_spots_Seurat.rds
 results/objects/13_spatial_SASH1_COL1A1_high_annotated_Seurat.rds
 results/objects/14_spatial_domain_annotated_paper_style_Seurat.rds
+```
+
+已作为分片文件上传的对象：
+
+```text
+results/objects/15_Figure4_like_scRNA_core_gene_expression_Seurat.rds.parts/
+results/objects/15b_Figure4_like_scRNA_cluster_core_gene_expression_Seurat.rds.parts/
+results/objects/16_Figure5_like_malignant_trajectory_core_gene_Seurat.rds.parts/
+```
+
+分片RDS可以用以下脚本重建：
+
+```bash
+bash scripts_utils/reconstruct_split_rds_objects.sh
+```
+
+重建后会得到：
+
+```text
 results/objects/15_Figure4_like_scRNA_core_gene_expression_Seurat.rds
 results/objects/15b_Figure4_like_scRNA_cluster_core_gene_expression_Seurat.rds
 results/objects/16_Figure5_like_malignant_trajectory_core_gene_Seurat.rds
 ```
+
 
 ## GitHub文件清单与作用
 
