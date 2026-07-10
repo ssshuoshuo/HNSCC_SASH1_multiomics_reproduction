@@ -1,397 +1,636 @@
-# HNSCC / OSCC SASH1 多组学复现流程
-
-本仓库用于复现一套以 SASH1 为核心的头颈鳞状细胞癌 / 口腔鳞状细胞癌（HNSCC / OSCC）多组学分析流程。
-
-项目包含两条主线：
-
-1. GSE215403 单细胞 RNA-seq 分析
-2. GSE252265 空间转录组分析
-
-整体目标是从公开数据出发，完成细胞类型注释、恶性上皮细胞识别、CopyKAT 辅助验证、Monocle3 全局细胞状态轨迹构建，以及 SASH1 / MYH11 / EMP1 / COL1A1 等核心基因在单细胞和空间转录组中的表达展示。
-
-## 1. 仓库结构
-
-scripts/：正式复现流程代码
-data/：原始数据与下载文件
-results/objects/：分析过程中生成的 RDS 对象
-results/tables/：CSV / TXT 结果表
-results/figures/：PDF 结果图
-config/：项目配置文件
-README.md：本说明文件
-
-大文件如 .h5、.rds、.tar.gz、.csv.gz、.mtx.gz 等通过 Git LFS 管理。
-
-## 2. 数据集
-
-### 2.1 GSE215403
-
-GSE215403 用于单细胞 RNA-seq 分析。流程包括原始 10x 矩阵读取、质控、Seurat 标准分析、细胞类型注释、肿瘤相关上皮候选群定义、CopyKAT 分析、恶性细胞审查，以及 Monocle3 全局轨迹构建。
-
-使用的样本包括：
-
-OSCC
-scB1
-scB2
-scB5
-scB7
-scB8
-scB9
-scB10
-scB12
-scB13
-scB14
-scB15
-
-### 2.2 GSE252265
-
-GSE252265 用于空间转录组分析。流程包括 Visium 表达矩阵读取、spot 坐标匹配、spot-level QC，以及 SASH1 / COL1A1 / EMP1 / MYH11 空间表达展示。
-
-## 3. 运行环境
-
-主要 R 包包括：
-
-Seurat
-SeuratObject
-Matrix
-dplyr
-tidyr
-ggplot2
-patchwork
-CopyKAT
-monocle3
-igraph
-pheatmap
-hdf5r
-
-建议使用：
-
-R >= 4.4
-Seurat >= 5
-monocle3 >= 1.3.1
-
-## 4. 脚本说明
-
-### 01_GSE215403_download_and_inventory.R
-
-功能：
-
-* 下载或整理 GSE215403 原始 10x 数据；
-* 建立样本目录；
-* 生成原始输入文件清单；
-* 为后续读取矩阵做准备。
-
-运行前需要检查：
-
-* project_dir
-* raw_dir
-* sample_dir
-
-### 02_GSE215403_read10x_and_merge.R
-
-功能：
-
-* 读取每个样本的 10x 表达矩阵；
-* 建立 Seurat 对象；
-* 合并多个样本；
-* 添加样本 ID 和基础 metadata；
-* 输出合并后的原始 Seurat 对象。
-
-推荐运行位置：
-
-* 服务器优先；
-* 高内存本地电脑也可运行。
-
-### 03_QC_reproduction_candidate.R
-
-功能：
-
-* 计算每个细胞的基因数、UMI 数和线粒体比例；
-* 根据设定阈值过滤细胞；
-* 输出 QC 前后统计表；
-* 输出 QC 可视化图；
-* 保存 QC 后 Seurat 对象。
-
-推荐运行位置：
-
-* 服务器优先；
-* 本地高内存环境可运行。
-
-### 04_standard_Seurat_multi_resolution.R
-
-功能：
-
-* LogNormalize；
-* 高变基因选择；
-* ScaleData；
-* PCA；
-* UMAP；
-* 多分辨率聚类；
-* 输出不同分辨率下的 cluster 结果；
-* 保存标准 Seurat 对象。
-
-后续主要使用：
-
-* RNA_snn_res.0.2
-
-推荐运行位置：
-
-* 服务器优先。
-
-### 05_major_cell_type_annotation.R
-
-功能：
-
-* 根据 marker 基因对主要 cluster 进行细胞类型注释；
-* 输出主细胞群 UMAP；
-* 输出 marker DotPlot；
-* 展示核心基因 SASH1 / MYH11 / EMP1 / COL1A1 在主要细胞群中的表达。
-
-主要细胞群包括：
-
-Cytotoxic_T_NKT
-Macrophage
-Differentiated_Tumor
-Cycling_Tumor
-CT_Antigen_Tumor
-Treg
-Tumor_Epithelial
-Fibroblast_CAF
-B_Cell
-Plasma_Cell
-Blood_Endothelial
-Mast_Cell
-pDC
-Lymphatic_Endothelial
-Salivary_Epithelial
-
-推荐运行位置：
-
-* 本地可运行。
-
-### 06_tumor_related_epithelial_candidates.R
-
-功能：
-
-* 基于 05c 注释定义肿瘤相关上皮候选 cluster；
-* 标记 salivary epithelial reference；
-* 输出候选群 UMAP；
-* 输出核心基因 DotPlot；
-* 为 CopyKAT 和后续恶性细胞判定做准备。
-
-初始肿瘤相关上皮候选群为：
-
-cluster 2：Differentiated_Tumor
-cluster 3：Cycling_Tumor
-cluster 4：CT_Antigen_Tumor
-cluster 6：Tumor_Epithelial
-cluster 11：Tumor_Epithelial
-
-推荐运行位置：
-
-* 本地可运行。
-
-### 07_CopyKAT_per_sample.R
-
-配套脚本：
-
-07_CopyKAT_per_sample_batch.sh
-
-功能：
-
-* 对每个样本分别运行 CopyKAT；
-* 判断 diploid / aneuploid 状态；
-* 输出每个样本的 CopyKAT 结果；
-* 为严格恶性细胞定义提供 CNV 支持。
-
-推荐运行位置：
-
-* 服务器优先。
-
-### 08_final_malignant_call.R
-
-配套脚本：
-
-08_final_malignant_call_batch.sh
-
-功能：
-
-* 整合各样本 CopyKAT 输出；
-* 将 CopyKAT aneuploid 结果映射回全细胞 Seurat 对象；
-* 定义 CopyKAT 支持的严格恶性细胞；
-* 输出最终恶性细胞 UMAP 和统计表。
-
-严格恶性细胞定义：
-
-tumor-related epithelial candidate + CopyKAT aneuploid
-
-推荐运行位置：
-
-* 本地可运行。
-
-### 09_strict_malignant_composition.R
-
-配套脚本：
-
-09_strict_malignant_composition_batch.sh
-
-功能：
-
-* 统计严格恶性细胞在不同 cluster 中的分布；
-* 统计严格恶性细胞在不同样本中的分布；
-* 输出组成表和辅助图。
-
-推荐运行位置：
-
-* 本地可运行。
-
-### 10_manual_review_epithelial_core.R
-
-功能：
-
-* 对严格恶性候选细胞进行二次审查；
-* 根据 marker 表达排除明显免疫、CAF、髓系混杂 cluster；
-* 保留更可信的上皮核心群；
-* 输出人工审查表；
-* 输出核心上皮状态相关图和表。
-
-推荐运行位置：
-
-* 本地可运行。
-
-### 11a_malignant_focus_cluster_audit.R
-
-功能：
-
-* 审查 cluster 2 / 3 / 4 / 6 / 11；
-* 整合 CopyKAT 支持比例；
-* 检查样本组成；
-* 检查 marker 表达；
-* 检查在 Monocle3 vertex-bin 中的分布；
-* 为最终选择 Core_Malignant_Focused 提供依据。
-
-本流程采用：
-
-Core_Malignant_Focused = cluster 6 + cluster 11
-
-同时保留：
-
-Extended_Malignant_Focused = cluster 4 + cluster 6 + cluster 11
-
-推荐运行位置：
-
-* 本地可运行。
-
-### 11b_core_malignant_global_trajectory.R
-
-功能：
-
-* 基于全细胞对象构建 Monocle3 global cellular-state graph；
-* 提取 principal graph edge 和 vertex；
-* 定义 Core 与 Extended 两套 malignant-focused 区域；
-* 在全局 graph 上展示 SASH1 / MYH11 / EMP1 / COL1A1；
-* 输出主图和敏感性分析图；
-* 保存用于后续重画的轻量化坐标和表格。
-
-主图使用：
-
-Core_Malignant_Focused = cluster 6 + cluster 11
-
-敏感性分析使用：
-
-Extended_Malignant_Focused = cluster 4 + cluster 6 + cluster 11
-
-推荐运行位置：
-
-* 服务器优先；
-* 高内存本地电脑可运行。
-
-### 12_spatial_download_QC_gene_maps.R
-
-功能：
-
-* 下载 GSE252265 空间转录组数据；
-* 读取 Visium H5 表达矩阵；
-* 读取 spot 坐标；
-* 检查 barcode 与坐标匹配；
-* 建立空间 Seurat 对象；
-* 计算 spot-level QC；
-* 输出 SASH1 / COL1A1 / EMP1 / MYH11 空间表达图；
-* 输出用于后续空间关系分析的 metadata。
-
-运行前需要检查：
-
-* project_dir
-* raw_dir
-* object_dir
-* table_dir
-* figure_dir
-
-推荐运行位置：
-
-* 本地可运行；
-* 数据下载较慢时可在服务器运行。
-
-## 5. 主要结果文件
-
-### 5.1 单细胞主要图
-
-results/figures/05_major_cell_populations_UMAP_final.pdf
-results/figures/06_tumor_candidate_and_salivary_reference_UMAP.pdf
-results/figures/08_final_malignant_call_UMAP.pdf
-results/figures/11b_core_vs_extended_malignant_focus_comparison.pdf
-results/figures/11b_core_malignant_focused_gene_overlays.pdf
-results/figures/11b_extended_malignant_focused_gene_overlays.pdf
-
-### 5.2 单细胞主要表格
-
-results/tables/08_CopyKAT_status_summary.csv
-results/tables/09_malignant_cell_composition_summary.csv
-results/tables/10_manual_review_cluster_decision.csv
-results/tables/11a_candidate_cluster_integrated_review_summary.csv
-results/tables/11b_malignant_focus_definition_summary.csv
-results/tables/11b_core_extended_gene_overlay_summary.csv
-
-### 5.3 空间转录组主要结果
-
-results/figures/12_spatial_QC_UMI_distribution.pdf
-results/figures/12_spatial_QC_detected_gene_distribution.pdf
-results/figures/12_SASH1_COL1A1_EMP1_MYH11_spatial_expression.pdf
-results/tables/12_spatial_spot_QC_summary.csv
-results/tables/12_SASH1_COL1A1_spot_detection_summary.csv
-
-## 6. 最终分析逻辑
-
-单细胞部分核心逻辑：
-
-全细胞 Seurat 聚类与注释
-→ 肿瘤相关上皮候选 cluster 定义
-→ CopyKAT 辅助识别 aneuploid 恶性细胞
-→ 审查候选 malignant-focused cluster
-→ 选定 cluster 6 + 11 作为 Core_Malignant_Focused
-→ 在全细胞 Monocle3 global graph 上展示核心基因表达
-
-主图定义：
-
-Core_Malignant_Focused = Seurat cluster 6 + 11
-
-补充敏感性定义：
-
-Extended_Malignant_Focused = Seurat cluster 4 + 6 + 11
-
-## 7. 使用说明
-
-所有脚本默认项目路径为：
-
-~/Desktop/HNSCC_SASH1_reproduction
-
-在其他电脑或服务器运行时，请修改脚本中的 project_dir。
-
-克隆仓库后请先确认 Git LFS 已安装：
-
-git lfs install
-git lfs pull
-
-查看结果可直接进入：
-
-results/figures/
-results/tables/
+# HNSCC/OSCC SASH1多组学论文复现
+
+本仓库用于复现HNSCC/OSCC中SASH1相关多组学研究的单细胞转录组和空间转录组分析模块。
+
+当前版本已经完成单细胞RNA-seq和空间转录组相关的阶段性复现，包括细胞注释、恶性细胞候选群体判断、核心基因表达图、恶性轨迹图、空间基因表达图、空间结构域近似注释，以及SASH1/COL1A1空间邻近关系分析。
+
+需要注意：当前仓库还不是整篇多组学论文的完整端到端复现。bulk RNA-seq、机器学习筛选、TCGA/外部队列验证、生存分析和药物反应相关模块仍待补充。
+
+## 当前复现完成度
+
+### 已完成
+
+- 单细胞RNA-seq数据下载、质控、降维、聚类和人工注释
+- 上皮/肿瘤细胞群体复核
+- CopyKAT辅助恶性细胞判断
+- 核心恶性focus clusters和扩展恶性focus clusters定义
+- Fig.4-like单细胞核心基因表达图
+- Fig.5-like恶性细胞轨迹和核心基因表达图
+- GSE252265空间转录组下载和质控
+- Fig.6-like空间结构域和核心基因表达图
+- SASH1-high和COL1A1-high空间共定位、最近邻距离和置换检验
+
+### 尚未完成
+
+- bulk RNA-seq差异表达分析
+- 机器学习生物标志物筛选
+- TCGA和外部队列验证
+- 生存和预后模型分析
+- 潜在治疗靶点或药物反应分析
+
+## 仓库文件夹说明
+
+- `config/`：配置文件目录，用于保存项目参数、路径或可复用配置。
+- `data/`：输入数据目录，包含单细胞和空间转录组分析所需的原始或整理后数据。
+- `data/raw/GSE252265/`：GSE252265空间转录组原始输入文件目录，用于脚本12–14。
+- `scripts/`：主分析脚本目录，01–16按顺序构成当前复现流程。
+- `scripts_utils/`：辅助脚本目录，目前用于split文件重建等非主流程工具。
+- `split_file_manifest/`：大文件切分后的manifest目录，用于记录分片文件和重建信息。
+- `results/`：分析结果目录，包含图、表和中间对象。
+- `results/figures/`：生成的图像结果，包括Fig.4-like、Fig.5-like、Fig.6-like和空间邻近分析图。
+- `results/tables/`：生成的表格结果，包括QC统计、表达汇总、空间邻近检验、轨迹metadata和sessionInfo。
+- `results/objects/`：生成的中间对象目录，主要保存Seurat对象、Monocle轨迹对象或大文件分片。
+- `tools/`：辅助工具目录，保存项目运行过程中需要的工具或本地辅助文件。
+
+## 01–16主流程脚本说明
+
+| 脚本 | 作用 |
+|---|---|
+| `scripts/01_download_and_prepare_scRNA.R` | 下载并整理GSE215403单细胞RNA-seq原始数据，建立后续分析所需的输入目录和基础文件。 |
+| `scripts/02_read_and_QC_scRNA.R` | 读取单细胞表达矩阵，创建Seurat对象，进行基础质控、过滤和标准化前处理。 |
+| `scripts/03_QC_reproduction_candidate.R` | 复现并检查论文单细胞质控指标，输出候选QC阈值、细胞数统计和相关图表。 |
+| `scripts/04_standard_Seurat_PCA_UMAP_resolution_scan.R` | 执行标准Seurat流程，包括归一化、高变基因、PCA、UMAP和不同resolution下的聚类扫描。 |
+| `scripts/05_manual_annotation_and_target_gene_summary.R` | 基于marker和聚类结果进行人工细胞类型注释，并总结SASH1等目标基因在各细胞类型中的表达。 |
+| `scripts/06_malignant_candidate_diagnostic.R` | 对上皮/肿瘤相关cluster进行诊断，筛选可能的恶性细胞候选群体。 |
+| `scripts/07_CopyKAT_malignant_call.R` | 运行CopyKAT推断拷贝数变化，用于辅助判断恶性细胞。 |
+| `scripts/07_CopyKAT_malignant_call_batch.sh` | CopyKAT分析的批处理脚本，适合长时间运行或分批运行。 |
+| `scripts/08_finalize_malignant_call.R` | 整合人工注释、cluster信息和CopyKAT结果，生成最终恶性细胞标签。 |
+| `scripts/08_finalize_malignant_call_batch.sh` | 最终恶性细胞注释流程的批处理脚本。 |
+| `scripts/09_malignant_cell_composition_check.R` | 检查恶性细胞在样本、cluster和细胞类型中的组成分布。 |
+| `scripts/09_malignant_cell_composition_check_batch.sh` | 恶性细胞组成检查的批处理脚本。 |
+| `scripts/10_manual_review_epithelial_core.R` | 对上皮细胞和核心肿瘤相关cluster进行人工复核。 |
+| `scripts/11a_malignant_focus_cluster_audit.R` | 审查核心恶性focus cluster和候选恶性相关cluster，输出审查表和诊断图。 |
+| `scripts/11b_core_extended_malignant_overlay_rebuild.R` | 重建核心/扩展恶性细胞状态覆盖图，并生成后续轨迹分析需要的输入文件。 |
+| `scripts/12_spatial_download_QC_gene_maps.R` | 下载并读取GSE252265空间转录组数据，完成空间spot质控和SASH1、COL1A1、EMP1、MYH11空间表达图。 |
+| `scripts/13_spatial_SASH1_COL1A1_neighborhood_analysis.R` | 分析SASH1-high和COL1A1-high spots的共定位、最近邻距离和空间置换检验。 |
+| `scripts/14_spatial_domain_annotation_and_core_gene_maps.R` | 基于marker score近似注释空间结构域，并生成Fig.6-like空间结构域和核心基因表达图。 |
+| `scripts/15_scRNA_core_gene_expression_Figure4_like.R` | 生成Fig.4-like单细胞核心基因表达图，重点展示主要细胞类型层面的SASH1、COL1A1、EMP1和MYH11表达。 |
+| `scripts/15b_scRNA_core_gene_expression_Figure4_cluster_like.R` | 生成cluster/cell type级别的Fig.4-like核心基因表达图，更接近论文中按cluster展示表达的形式。 |
+| `scripts/16_scRNA_malignant_trajectory_Figure5_like.R` | 生成Fig.5-like恶性细胞轨迹、核心基因表达和gene-high状态图。 |
+
+## 运行顺序
+
+建议按照脚本编号顺序运行。部分步骤耗时较长，CopyKAT相关脚本可以使用对应batch脚本。
+
+```bash
+Rscript scripts/01_download_and_prepare_scRNA.R
+Rscript scripts/02_read_and_QC_scRNA.R
+Rscript scripts/03_QC_reproduction_candidate.R
+Rscript scripts/04_standard_Seurat_PCA_UMAP_resolution_scan.R
+Rscript scripts/05_manual_annotation_and_target_gene_summary.R
+Rscript scripts/06_malignant_candidate_diagnostic.R
+Rscript scripts/07_CopyKAT_malignant_call.R
+Rscript scripts/08_finalize_malignant_call.R
+Rscript scripts/09_malignant_cell_composition_check.R
+Rscript scripts/10_manual_review_epithelial_core.R
+Rscript scripts/11a_malignant_focus_cluster_audit.R
+Rscript scripts/11b_core_extended_malignant_overlay_rebuild.R
+Rscript scripts/12_spatial_download_QC_gene_maps.R
+Rscript scripts/13_spatial_SASH1_COL1A1_neighborhood_analysis.R
+Rscript scripts/14_spatial_domain_annotation_and_core_gene_maps.R
+Rscript scripts/15_scRNA_core_gene_expression_Figure4_like.R
+Rscript scripts/15b_scRNA_core_gene_expression_Figure4_cluster_like.R
+Rscript scripts/16_scRNA_malignant_trajectory_Figure5_like.R
+```
+
+## 恶性细胞注释策略
+
+当前复现采用以下恶性细胞focus定义：
+
+```text
+核心恶性focus clusters：6和11
+扩展恶性focus cluster：4
+候选恶性相关肿瘤clusters：2和3
+```
+
+CopyKAT结果作为辅助证据之一，用于支持恶性细胞群体判断。
+
+## 空间转录组分析说明
+
+当前空间分析基于GSE252265提供的表达矩阵和空间坐标文件进行。由于公开文件中没有标准Seurat空间对象所需的完整H&E图像和按样本拆分的图像信息，因此目前采用基于坐标的空间表达分析和marker-score空间结构域近似注释。
+
+当前限制：
+
+```text
+空间样本ID目前统一记为All_spots
+没有H&E图像叠加
+空间结构域为marker-score近似注释，不等同于原文作者基于病理图像的人工结构域注释
+```
+
+## 当前主要结果
+
+- SASH1、COL1A1、EMP1和MYH11已经在主要细胞类型、cluster级别细胞类型和恶性轨迹空间中完成可视化。
+- SASH1-high和COL1A1-high spots在当前空间坐标分析中重叠有限。
+- 在当前置换检验框架下，SASH1-high和COL1A1-high没有表现出明显空间共定位富集。
+
+## 大型中间RDS文件说明
+
+以下脚本12–16生成的大型Seurat对象目前暂未上传，因为文件较大，并且可以由对应脚本重新生成。后续如果需要完整保存中间对象，可以通过Git LFS逐个补充上传。
+
+```text
+results/objects/12_spatial_tissue_spots_Seurat.rds
+results/objects/13_spatial_SASH1_COL1A1_high_annotated_Seurat.rds
+results/objects/14_spatial_domain_annotated_paper_style_Seurat.rds
+results/objects/15_Figure4_like_scRNA_core_gene_expression_Seurat.rds
+results/objects/15b_Figure4_like_scRNA_cluster_core_gene_expression_Seurat.rds
+results/objects/16_Figure5_like_malignant_trajectory_core_gene_Seurat.rds
+```
+
+## GitHub文件清单与作用
+
+本节自动列出当前Git已追踪文件，并说明每个文件或文件夹的作用。
+
+### 根目录
+
+| 文件 | 作用 |
+|---|---|
+| `.gitattributes` | Git LFS追踪规则，用于管理RDS、压缩包等大文件。 |
+| `.gitignore` | Git忽略规则，避免上传临时文件、日志文件和暂不上传的大型中间RDS。 |
+| `HNSCC_SASH1_reproduction.Rproj` | RStudio项目文件，便于在RStudio中打开整个复现项目。 |
+| `README.md` | 项目说明文件，记录仓库结构、运行顺序、当前完成度、文件作用和注意事项。 |
+
+### config/
+
+配置文件目录，用于保存项目参数、路径或可复用配置。
+
+| 文件 | 作用 |
+|---|---|
+| `config/GSE215403_sample_metadata.csv` | 项目配置文件。 |
+
+### data/
+
+输入数据目录，包含单细胞和空间转录组分析所需的原始或整理后数据。
+
+| 文件 | 作用 |
+|---|---|
+| `data/processed/scRNA_GSE215403/10x_by_sample/OSCC/barcodes.tsv.gz` | 项目文件。 |
+| `data/processed/scRNA_GSE215403/10x_by_sample/OSCC/features.tsv.gz` | 项目文件。 |
+| `data/processed/scRNA_GSE215403/10x_by_sample/OSCC/matrix.mtx.gz` | 项目文件。 |
+| `data/processed/scRNA_GSE215403/10x_by_sample/scB1/barcodes.tsv.gz` | 项目文件。 |
+| `data/processed/scRNA_GSE215403/10x_by_sample/scB1/features.tsv.gz` | 项目文件。 |
+| `data/processed/scRNA_GSE215403/10x_by_sample/scB1/matrix.mtx.gz` | 项目文件。 |
+| `data/processed/scRNA_GSE215403/10x_by_sample/scB10/barcodes.tsv.gz` | 项目文件。 |
+| `data/processed/scRNA_GSE215403/10x_by_sample/scB10/features.tsv.gz` | 项目文件。 |
+| `data/processed/scRNA_GSE215403/10x_by_sample/scB10/matrix.mtx.gz` | 项目文件。 |
+| `data/processed/scRNA_GSE215403/10x_by_sample/scB12/barcodes.tsv.gz` | 项目文件。 |
+| `data/processed/scRNA_GSE215403/10x_by_sample/scB12/features.tsv.gz` | 项目文件。 |
+| `data/processed/scRNA_GSE215403/10x_by_sample/scB12/matrix.mtx.gz` | 项目文件。 |
+| `data/processed/scRNA_GSE215403/10x_by_sample/scB13/barcodes.tsv.gz` | 项目文件。 |
+| `data/processed/scRNA_GSE215403/10x_by_sample/scB13/features.tsv.gz` | 项目文件。 |
+| `data/processed/scRNA_GSE215403/10x_by_sample/scB13/matrix.mtx.gz` | 项目文件。 |
+| `data/processed/scRNA_GSE215403/10x_by_sample/scB14/barcodes.tsv.gz` | 项目文件。 |
+| `data/processed/scRNA_GSE215403/10x_by_sample/scB14/features.tsv.gz` | 项目文件。 |
+| `data/processed/scRNA_GSE215403/10x_by_sample/scB14/matrix.mtx.gz` | 项目文件。 |
+| `data/processed/scRNA_GSE215403/10x_by_sample/scB15/barcodes.tsv.gz` | 项目文件。 |
+| `data/processed/scRNA_GSE215403/10x_by_sample/scB15/features.tsv.gz` | 项目文件。 |
+| `data/processed/scRNA_GSE215403/10x_by_sample/scB15/matrix.mtx.gz` | 项目文件。 |
+| `data/processed/scRNA_GSE215403/10x_by_sample/scB2/barcodes.tsv.gz` | 项目文件。 |
+| `data/processed/scRNA_GSE215403/10x_by_sample/scB2/features.tsv.gz` | 项目文件。 |
+| `data/processed/scRNA_GSE215403/10x_by_sample/scB2/matrix.mtx.gz` | 项目文件。 |
+| `data/processed/scRNA_GSE215403/10x_by_sample/scB5/barcodes.tsv.gz` | 项目文件。 |
+| `data/processed/scRNA_GSE215403/10x_by_sample/scB5/features.tsv.gz` | 项目文件。 |
+| `data/processed/scRNA_GSE215403/10x_by_sample/scB5/matrix.mtx.gz` | 项目文件。 |
+| `data/processed/scRNA_GSE215403/10x_by_sample/scB7/barcodes.tsv.gz` | 项目文件。 |
+| `data/processed/scRNA_GSE215403/10x_by_sample/scB7/features.tsv.gz` | 项目文件。 |
+| `data/processed/scRNA_GSE215403/10x_by_sample/scB7/matrix.mtx.gz` | 项目文件。 |
+| `data/processed/scRNA_GSE215403/10x_by_sample/scB8/barcodes.tsv.gz` | 项目文件。 |
+| `data/processed/scRNA_GSE215403/10x_by_sample/scB8/features.tsv.gz` | 项目文件。 |
+| `data/processed/scRNA_GSE215403/10x_by_sample/scB8/matrix.mtx.gz` | 项目文件。 |
+| `data/processed/scRNA_GSE215403/10x_by_sample/scB9/barcodes.tsv.gz` | 项目文件。 |
+| `data/processed/scRNA_GSE215403/10x_by_sample/scB9/features.tsv.gz` | 项目文件。 |
+| `data/processed/scRNA_GSE215403/10x_by_sample/scB9/matrix.mtx.gz` | 项目文件。 |
+| `data/processed/scRNA_GSE215403/GSM6634869_OSCC_barcodes.tsv.gz` | 项目文件。 |
+| `data/processed/scRNA_GSE215403/GSM6634869_OSCC_features.tsv.gz` | 项目文件。 |
+| `data/processed/scRNA_GSE215403/GSM6634869_OSCC_matrix.mtx.gz` | 项目文件。 |
+| `data/processed/scRNA_GSE215403/GSM6634870_scB1_barcodes.tsv.gz` | 项目文件。 |
+| `data/processed/scRNA_GSE215403/GSM6634870_scB1_features.tsv.gz` | 项目文件。 |
+| `data/processed/scRNA_GSE215403/GSM6634870_scB1_matrix.mtx.gz` | 项目文件。 |
+| `data/processed/scRNA_GSE215403/GSM6634871_scB2_barcodes.tsv.gz` | 项目文件。 |
+| `data/processed/scRNA_GSE215403/GSM6634871_scB2_features.tsv.gz` | 项目文件。 |
+| `data/processed/scRNA_GSE215403/GSM6634871_scB2_matrix.mtx.gz` | 项目文件。 |
+| `data/processed/scRNA_GSE215403/GSM6634872_scB5_barcodes.tsv.gz` | 项目文件。 |
+| `data/processed/scRNA_GSE215403/GSM6634872_scB5_features.tsv.gz` | 项目文件。 |
+| `data/processed/scRNA_GSE215403/GSM6634872_scB5_matrix.mtx.gz` | 项目文件。 |
+| `data/processed/scRNA_GSE215403/GSM6634873_scB7_barcodes.tsv.gz` | 项目文件。 |
+| `data/processed/scRNA_GSE215403/GSM6634873_scB7_features.tsv.gz` | 项目文件。 |
+| `data/processed/scRNA_GSE215403/GSM6634873_scB7_matrix.mtx.gz` | 项目文件。 |
+| `data/processed/scRNA_GSE215403/GSM6634874_scB8_barcodes.tsv.gz` | 项目文件。 |
+| `data/processed/scRNA_GSE215403/GSM6634874_scB8_features.tsv.gz` | 项目文件。 |
+| `data/processed/scRNA_GSE215403/GSM6634874_scB8_matrix.mtx.gz` | 项目文件。 |
+| `data/processed/scRNA_GSE215403/GSM6634875_scB9_barcodes.tsv.gz` | 项目文件。 |
+| `data/processed/scRNA_GSE215403/GSM6634875_scB9_features.tsv.gz` | 项目文件。 |
+| `data/processed/scRNA_GSE215403/GSM6634875_scB9_matrix.mtx.gz` | 项目文件。 |
+| `data/processed/scRNA_GSE215403/GSM6634876_scB10_barcodes.tsv.gz` | 项目文件。 |
+| `data/processed/scRNA_GSE215403/GSM6634876_scB10_features.tsv.gz` | 项目文件。 |
+| `data/processed/scRNA_GSE215403/GSM6634876_scB10_matrix.mtx.gz` | 项目文件。 |
+| `data/processed/scRNA_GSE215403/GSM6634877_scB12_barcodes.tsv.gz` | 项目文件。 |
+| `data/processed/scRNA_GSE215403/GSM6634877_scB12_features.tsv.gz` | 项目文件。 |
+| `data/processed/scRNA_GSE215403/GSM6634877_scB12_matrix.mtx.gz` | 项目文件。 |
+| `data/processed/scRNA_GSE215403/GSM6634878_scB13_barcodes.tsv.gz` | 项目文件。 |
+| `data/processed/scRNA_GSE215403/GSM6634878_scB13_features.tsv.gz` | 项目文件。 |
+| `data/processed/scRNA_GSE215403/GSM6634878_scB13_matrix.mtx.gz` | 项目文件。 |
+| `data/processed/scRNA_GSE215403/GSM6634879_scB14_barcodes.tsv.gz` | 项目文件。 |
+| `data/processed/scRNA_GSE215403/GSM6634879_scB14_features.tsv.gz` | 项目文件。 |
+| `data/processed/scRNA_GSE215403/GSM6634879_scB14_matrix.mtx.gz` | 项目文件。 |
+| `data/processed/scRNA_GSE215403/GSM6634880_scB15_barcodes.tsv.gz` | 项目文件。 |
+| `data/processed/scRNA_GSE215403/GSM6634880_scB15_features.tsv.gz` | 项目文件。 |
+| `data/processed/scRNA_GSE215403/GSM6634880_scB15_matrix.mtx.gz` | 项目文件。 |
+| `data/raw/scRNA_GSE215403/GSE215403_RAW.tar` | 项目文件。 |
+
+### data/raw/GSE252265/
+
+GSE252265空间转录组原始输入文件目录，用于脚本12–14。
+
+| 文件 | 作用 |
+|---|---|
+| `data/raw/GSE252265/GSE252265_RAW.tar` | GSE252265补充原始文件压缩包。 |
+| `data/raw/GSE252265/GSE252265_aggr_tissue_positions.csv.gz` | GSE252265空间坐标表，用于将表达矩阵和组织位置对应。 |
+| `data/raw/GSE252265/GSE252265_aggregation.csv.gz` | GSE252265聚合信息表。 |
+| `data/raw/GSE252265/GSE252265_barcodes.tsv.gz` | GSE252265空间spot/cell barcode列表。 |
+| `data/raw/GSE252265/GSE252265_features.tsv.gz` | GSE252265基因/feature注释表。 |
+| `data/raw/GSE252265/GSE252265_filtered_feature_bc_matrix.h5` | GSE252265过滤后的feature-barcode表达矩阵，HDF5格式。 |
+| `data/raw/GSE252265/GSE252265_matrix.mtx.gz` | GSE252265表达矩阵，Matrix Market压缩格式。 |
+
+### scripts/
+
+主分析脚本目录，01–16按顺序构成当前复现流程。
+
+| 文件 | 作用 |
+|---|---|
+| `scripts/01_download_and_prepare_scRNA.R` | 下载并整理GSE215403单细胞RNA-seq原始数据，建立后续分析所需的输入目录和基础文件。 |
+| `scripts/02_read_and_QC_scRNA.R` | 读取单细胞表达矩阵，创建Seurat对象，进行基础质控、过滤和标准化前处理。 |
+| `scripts/03_QC_reproduction_candidate.R` | 复现并检查论文单细胞质控指标，输出候选QC阈值、细胞数统计和相关图表。 |
+| `scripts/04_standard_Seurat_PCA_UMAP_resolution_scan.R` | 执行标准Seurat流程，包括归一化、高变基因、PCA、UMAP和不同resolution下的聚类扫描。 |
+| `scripts/05_manual_annotation_and_target_gene_summary.R` | 基于marker和聚类结果进行人工细胞类型注释，并总结SASH1等目标基因在各细胞类型中的表达。 |
+| `scripts/06_malignant_candidate_diagnostic.R` | 对上皮/肿瘤相关cluster进行诊断，筛选可能的恶性细胞候选群体。 |
+| `scripts/07_CopyKAT_malignant_call.R` | 运行CopyKAT推断拷贝数变化，用于辅助判断恶性细胞。 |
+| `scripts/07_CopyKAT_malignant_call_batch.sh` | CopyKAT分析的批处理脚本，适合长时间运行或分批运行。 |
+| `scripts/08_finalize_malignant_call.R` | 整合人工注释、cluster信息和CopyKAT结果，生成最终恶性细胞标签。 |
+| `scripts/08_finalize_malignant_call_batch.sh` | 最终恶性细胞注释流程的批处理脚本。 |
+| `scripts/09_malignant_cell_composition_check.R` | 检查恶性细胞在样本、cluster和细胞类型中的组成分布。 |
+| `scripts/09_malignant_cell_composition_check_batch.sh` | 恶性细胞组成检查的批处理脚本。 |
+| `scripts/10_manual_review_epithelial_core.R` | 对上皮细胞和核心肿瘤相关cluster进行人工复核。 |
+| `scripts/11a_malignant_focus_cluster_audit.R` | 审查核心恶性focus cluster和候选恶性相关cluster，输出审查表和诊断图。 |
+| `scripts/11b_core_extended_malignant_overlay_rebuild.R` | 重建核心/扩展恶性细胞状态覆盖图，并生成后续轨迹分析需要的输入文件。 |
+| `scripts/12_spatial_download_QC_gene_maps.R` | 下载并读取GSE252265空间转录组数据，完成空间spot质控和SASH1、COL1A1、EMP1、MYH11空间表达图。 |
+| `scripts/13_spatial_SASH1_COL1A1_neighborhood_analysis.R` | 分析SASH1-high和COL1A1-high spots的共定位、最近邻距离和空间置换检验。 |
+| `scripts/14_spatial_domain_annotation_and_core_gene_maps.R` | 基于marker score近似注释空间结构域，并生成Fig.6-like空间结构域和核心基因表达图。 |
+| `scripts/15_scRNA_core_gene_expression_Figure4_like.R` | 生成Fig.4-like单细胞核心基因表达图，重点展示主要细胞类型层面的SASH1、COL1A1、EMP1和MYH11表达。 |
+| `scripts/15b_scRNA_core_gene_expression_Figure4_cluster_like.R` | 生成cluster/cell type级别的Fig.4-like核心基因表达图，更接近论文中按cluster展示表达的形式。 |
+| `scripts/16_scRNA_malignant_trajectory_Figure5_like.R` | 生成Fig.5-like恶性细胞轨迹、核心基因表达和gene-high状态图。 |
+
+### scripts_utils/
+
+辅助脚本目录，目前用于split文件重建等非主流程工具。
+
+| 文件 | 作用 |
+|---|---|
+| `scripts_utils/reconstruct_split_files.sh` | 根据split_file_manifest和.parts文件夹重建被切分的大型RDS文件。 |
+
+### split_file_manifest/
+
+大文件切分后的manifest目录，用于记录分片文件和重建信息。
+
+| 文件 | 作用 |
+|---|---|
+| `split_file_manifest/oversized_files.txt` | 大文件切分和重建所需的manifest记录。 |
+
+### results/figures/
+
+生成的图像结果，包括Fig.4-like、Fig.5-like、Fig.6-like和空间邻近分析图。
+
+| 文件 | 作用 |
+|---|---|
+| `results/figures/02_QC_scatter_nCount_vs_feature.pdf` | 脚本02生成的结果图。 |
+| `results/figures/02_QC_scatter_nCount_vs_mt.pdf` | 脚本02生成的结果图。 |
+| `results/figures/02_QC_violin_by_sample.pdf` | 脚本02生成的结果图。 |
+| `results/figures/02_QC_violin_by_sample.png` | 脚本02生成的结果图。 |
+| `results/figures/03_QC_before_after_reproduction_candidate.pdf` | 脚本03生成的结果图。 |
+| `results/figures/03_QC_before_after_reproduction_candidate.png` | 脚本03生成的结果图。 |
+| `results/figures/03_QC_violin_after_filtering.pdf` | 脚本03生成的结果图。 |
+| `results/figures/03_cell_number_before_after_QC.pdf` | 脚本03生成的结果图。 |
+| `results/figures/03_cell_number_before_after_QC.png` | 脚本03生成的结果图。 |
+| `results/figures/03_cell_number_old03_vs_reproduction_candidate.pdf` | 脚本03生成的结果图。 |
+| `results/figures/04_Harmony_UMAP_sample_and_cluster.pdf` | 脚本04生成的结果图。 |
+| `results/figures/04_Harmony_UMAP_sample_and_cluster.png` | 脚本04生成的结果图。 |
+| `results/figures/04_PCA_elbow_plot.pdf` | 脚本04生成的结果图。 |
+| `results/figures/04_PCA_elbow_plot.png` | 脚本04生成的结果图。 |
+| `results/figures/04_UMAP_cluster_resolution_0.2.pdf` | 脚本04生成的结果图。 |
+| `results/figures/04_UMAP_cluster_resolution_0.3.pdf` | 脚本04生成的结果图。 |
+| `results/figures/04_UMAP_cluster_resolution_0.5.pdf` | 脚本04生成的结果图。 |
+| `results/figures/04_UMAP_sample_and_primary_cluster.pdf` | 脚本04生成的结果图。 |
+| `results/figures/04_UMAP_sample_and_primary_cluster.png` | 脚本04生成的结果图。 |
+| `results/figures/05_UMAP_cluster_and_manual_celltype.pdf` | 脚本05生成的结果图。 |
+| `results/figures/05_UMAP_cluster_and_manual_celltype.png` | 脚本05生成的结果图。 |
+| `results/figures/05_UMAP_cluster_and_manual_celltype_polished.pdf` | 脚本05生成的结果图。 |
+| `results/figures/05_UMAP_cluster_and_manual_celltype_polished.png` | 脚本05生成的结果图。 |
+| `results/figures/05_UMAP_cluster_and_preliminary_annotation.pdf` | 脚本05生成的结果图。 |
+| `results/figures/05_UMAP_cluster_and_preliminary_annotation.png` | 脚本05生成的结果图。 |
+| `results/figures/05_canonical_marker_DotPlot.pdf` | 脚本05生成的结果图。 |
+| `results/figures/05_canonical_marker_DotPlot.png` | 脚本05生成的结果图。 |
+| `results/figures/05_diagnostic_FeaturePlot_Epithelial_markers.pdf` | 脚本05生成的结果图。 |
+| `results/figures/05_diagnostic_FeaturePlot_Immune_markers.pdf` | 脚本05生成的结果图。 |
+| `results/figures/05_diagnostic_FeaturePlot_Pericyte_mural_markers.pdf` | 脚本05生成的结果图。 |
+| `results/figures/05_diagnostic_FeaturePlot_Stromal_vascular_markers.pdf` | 脚本05生成的结果图。 |
+| `results/figures/05_diagnostic_cluster_by_sample_heatmap_resolution_0.2.pdf` | 脚本05生成的结果图。 |
+| `results/figures/05_diagnostic_major_lineage_DotPlot_resolution_0.2.pdf` | 脚本05生成的结果图。 |
+| `results/figures/05_diagnostic_major_lineage_DotPlot_resolution_0.2.png` | 脚本05生成的结果图。 |
+| `results/figures/05_diagnostic_target_genes_UMAP_resolution_0.2.pdf` | 脚本05生成的结果图。 |
+| `results/figures/05_major_cell_populations_UMAP_final.pdf` | 脚本05生成的结果图。 |
+| `results/figures/05_major_cell_populations_UMAP_final.png` | 脚本05生成的结果图。 |
+| `results/figures/05_manual_celltype_UMAP_paper_style.pdf` | 脚本05生成的结果图。 |
+| `results/figures/05_manual_celltype_UMAP_paper_style.png` | 脚本05生成的结果图。 |
+| `results/figures/05_target_genes_DotPlot_by_manual_celltype.pdf` | 脚本05生成的结果图。 |
+| `results/figures/05_target_genes_UMAP.pdf` | 脚本05生成的结果图。 |
+| `results/figures/05_target_genes_UMAP.png` | 脚本05生成的结果图。 |
+| `results/figures/05_target_genes_UMAP_quantile_scaled.pdf` | 脚本05生成的结果图。 |
+| `results/figures/05_target_genes_VlnPlot_by_manual_celltype.pdf` | 脚本05生成的结果图。 |
+| `results/figures/05_target_genes_by_preliminary_celltype.pdf` | 脚本05生成的结果图。 |
+| `results/figures/05_top5_markers_heatmap.pdf` | 脚本05生成的结果图。 |
+| `results/figures/06_epithelial_pseudotime_UMAP.pdf` | 脚本06生成的结果图。 |
+| `results/figures/06_epithelial_pseudotime_UMAP.png` | 脚本06生成的结果图。 |
+| `results/figures/06_epithelial_salivary_tumor_marker_DotPlot.pdf` | 脚本06生成的结果图。 |
+| `results/figures/06_epithelial_state_UMAP.pdf` | 脚本06生成的结果图。 |
+| `results/figures/06_epithelial_state_scores_along_pseudotime.pdf` | 脚本06生成的结果图。 |
+| `results/figures/06_epithelial_subset_UMAP_cluster_and_sample.pdf` | 脚本06生成的结果图。 |
+| `results/figures/06_epithelial_subset_UMAP_cluster_and_sample.png` | 脚本06生成的结果图。 |
+| `results/figures/06_gene_expression_trends_along_pseudotime.pdf` | 脚本06生成的结果图。 |
+| `results/figures/06_target_genes_DotPlot_by_diagnostic_status.pdf` | 脚本06生成的结果图。 |
+| `results/figures/06_target_genes_VlnPlot_by_diagnostic_status.pdf` | 脚本06生成的结果图。 |
+| `results/figures/06_target_genes_by_epithelial_cluster.pdf` | 脚本06生成的结果图。 |
+| `results/figures/06_target_genes_in_epithelial_like_UMAP.pdf` | 脚本06生成的结果图。 |
+| `results/figures/06_tumor_candidate_and_salivary_reference_UMAP.pdf` | 脚本06生成的结果图。 |
+| `results/figures/06_tumor_candidate_and_salivary_reference_UMAP.png` | 脚本06生成的结果图。 |
+| `results/figures/06c_chromosome_aware_CNV_expression_heatmap.pdf` | 脚本06生成的结果图。 |
+| `results/figures/06c_chromosome_aware_CNV_expression_scores.pdf` | 脚本06生成的结果图。 |
+| `results/figures/06c_chromosome_level_deviation_heatmap.pdf` | 脚本06生成的结果图。 |
+| `results/figures/07_CopyKAT_aneuploid_tumor_candidate_UMAP.pdf` | 脚本07生成的结果图。 |
+| `results/figures/07_CopyKAT_prediction_UMAP.pdf` | 脚本07生成的结果图。 |
+| `results/figures/07a_cluster6_strict_malignant_UMAP_sample_and_subcluster.pdf` | 脚本07生成的结果图。 |
+| `results/figures/07a_cluster6_strict_malignant_core_gene_UMAP.pdf` | 脚本07生成的结果图。 |
+| `results/figures/07a_cluster6_strict_malignant_core_gene_by_sample.pdf` | 脚本07生成的结果图。 |
+| `results/figures/07b_refined_epithelial_malignant_UMAP_sample_and_subcluster.pdf` | 脚本07生成的结果图。 |
+| `results/figures/07b_refined_epithelial_malignant_core_gene_UMAP.pdf` | 脚本07生成的结果图。 |
+| `results/figures/07b_strict_malignant_epithelial_refinement_UMAP.pdf` | 脚本07生成的结果图。 |
+| `results/figures/07b_strict_malignant_lineage_module_scores_UMAP.pdf` | 脚本07生成的结果图。 |
+| `results/figures/07c_core_gene_expression_by_malignant_state.pdf` | 脚本07生成的结果图。 |
+| `results/figures/07c_malignant_state_cluster_and_annotation_UMAP.pdf` | 脚本07生成的结果图。 |
+| `results/figures/07c_malignant_state_module_scores_UMAP.pdf` | 脚本07生成的结果图。 |
+| `results/figures/08_CopyKAT_aneuploid_fraction_by_cluster.pdf` | 脚本08生成的结果图。 |
+| `results/figures/08_CopyKAT_aneuploid_fraction_by_sample_cluster.pdf` | 脚本08生成的结果图。 |
+| `results/figures/08_core_gene_expression_by_final_status.pdf` | 脚本08生成的结果图。 |
+| `results/figures/08_final_malignant_status_UMAP.pdf` | 脚本08生成的结果图。 |
+| `results/figures/08a_epithelial_core_sample_cluster_heatmap.pdf` | 脚本08生成的结果图。 |
+| `results/figures/08a_within_sample_trajectory_candidate_UMAP_panel.pdf` | 脚本08生成的结果图。 |
+| `results/figures/09_strict_malignant_cell_composition_by_cluster.pdf` | 脚本09生成的结果图。 |
+| `results/figures/09_strict_malignant_cell_composition_by_sample.pdf` | 脚本09生成的结果图。 |
+| `results/figures/09_strict_malignant_cells_by_sample_cluster.pdf` | 脚本09生成的结果图。 |
+| `results/figures/10_core_gene_expression_by_epithelial_core_state.pdf` | 脚本10生成的结果图。 |
+| `results/figures/10_epithelial_core_UMAP_sample_cluster_program.pdf` | 脚本10生成的结果图。 |
+| `results/figures/10_epithelial_core_relative_program_scores_UMAP.pdf` | 脚本10生成的结果图。 |
+| `results/figures/10_manual_review_cluster_decision_UMAP.pdf` | 脚本10生成的结果图。 |
+| `results/figures/11_global_cellular_trajectory_vertex_bins_paper_style.pdf` | 脚本11生成的结果图。 |
+| `results/figures/11_global_cellular_trajectory_vertex_groups.pdf` | 脚本11生成的结果图。 |
+| `results/figures/11_global_trajectory_major_cell_type.pdf` | 脚本11生成的结果图。 |
+| `results/figures/11_global_trajectory_malignant_focused_cells.pdf` | 脚本11生成的结果图。 |
+| `results/figures/11_malignant_focused_gene_trajectory_overlays.pdf` | 脚本11生成的结果图。 |
+| `results/figures/11_malignant_focused_gene_trajectory_overlays_paper_style.pdf` | 脚本11生成的结果图。 |
+| `results/figures/11a_candidate_cluster_CopyKAT_support.pdf` | 脚本11生成的结果图。 |
+| `results/figures/11a_candidate_cluster_marker_DotPlot.pdf` | 脚本11生成的结果图。 |
+| `results/figures/11a_candidate_cluster_sample_composition_heatmap.pdf` | 脚本11生成的结果图。 |
+| `results/figures/11a_candidate_cluster_vertex_bin_distribution.pdf` | 脚本11生成的结果图。 |
+| `results/figures/11a_candidate_malignant_clusters_UMAP.pdf` | 脚本11生成的结果图。 |
+| `results/figures/11b_core_malignant_focused_gene_overlays.pdf` | 脚本11生成的结果图。 |
+| `results/figures/11b_core_vs_extended_malignant_focus_comparison.pdf` | 脚本11生成的结果图。 |
+| `results/figures/11b_extended_malignant_focused_gene_overlays.pdf` | 脚本11生成的结果图。 |
+| `results/figures/12_SASH1_COL1A1_EMP1_MYH11_spatial_expression.pdf` | 脚本12生成的结果图。 |
+| `results/figures/12_spatial_QC_UMI_distribution.pdf` | 脚本12生成的结果图。 |
+| `results/figures/12_spatial_QC_detected_gene_distribution.pdf` | 脚本12生成的结果图。 |
+| `results/figures/12_spatial_QC_percent_mt_distribution.pdf` | 脚本12生成的结果图。 |
+| `results/figures/13_SASH1_COL1A1_high_colocalization_barplot.pdf` | 脚本13生成的结果图。 |
+| `results/figures/13_SASH1_COL1A1_high_neighborhood_permutation_test.pdf` | 脚本13生成的结果图。 |
+| `results/figures/13_SASH1_high_COL1A1_high_spatial_overlay.pdf` | 脚本13生成的结果图。 |
+| `results/figures/13_core_gene_spatial_expression_panel.pdf` | 脚本13生成的结果图。 |
+| `results/figures/14_spatial_domain_COL1A1_expression.pdf` | 脚本14生成的结果图。 |
+| `results/figures/14_spatial_domain_EMP1_expression.pdf` | 脚本14生成的结果图。 |
+| `results/figures/14_spatial_domain_Figure6_like_panel.pdf` | 脚本14生成的结果图。 |
+| `results/figures/14_spatial_domain_MYH11_expression.pdf` | 脚本14生成的结果图。 |
+| `results/figures/14_spatial_domain_SASH1_expression.pdf` | 脚本14生成的结果图。 |
+| `results/figures/14_spatial_domain_annotation.pdf` | 脚本14生成的结果图。 |
+| `results/figures/14_spatial_domain_tissue_layout.pdf` | 脚本14生成的结果图。 |
+| `results/figures/15_Figure4_core_gene_FeaturePlot_panel.pdf` | 脚本15生成的结果图。 |
+| `results/figures/15_Figure4_core_gene_VlnPlot_panel.pdf` | 脚本15生成的结果图。 |
+| `results/figures/15_Figure4_like_scRNA_core_gene_expression_panel.pdf` | 脚本15生成的结果图。 |
+| `results/figures/15_Figure4a_scRNA_celltype_UMAP.pdf` | 脚本15生成的结果图。 |
+| `results/figures/15_Figure4a_scRNA_celltype_UMAP.png` | 脚本15生成的结果图。 |
+| `results/figures/15_Figure4b_core_gene_DotPlot_by_celltype.pdf` | 脚本15生成的结果图。 |
+| `results/figures/15b_Figure4_FeaturePlot_COL1A1.pdf` | 脚本15b生成的结果图。 |
+| `results/figures/15b_Figure4_FeaturePlot_EMP1.pdf` | 脚本15b生成的结果图。 |
+| `results/figures/15b_Figure4_FeaturePlot_MYH11.pdf` | 脚本15b生成的结果图。 |
+| `results/figures/15b_Figure4_FeaturePlot_SASH1.pdf` | 脚本15b生成的结果图。 |
+| `results/figures/15b_Figure4_VlnPlot_COL1A1_by_cluster_celltype.pdf` | 脚本15b生成的结果图。 |
+| `results/figures/15b_Figure4_VlnPlot_EMP1_by_cluster_celltype.pdf` | 脚本15b生成的结果图。 |
+| `results/figures/15b_Figure4_VlnPlot_MYH11_by_cluster_celltype.pdf` | 脚本15b生成的结果图。 |
+| `results/figures/15b_Figure4_VlnPlot_SASH1_by_cluster_celltype.pdf` | 脚本15b生成的结果图。 |
+| `results/figures/15b_Figure4_cluster_celltype_UMAP.pdf` | 脚本15b生成的结果图。 |
+| `results/figures/15b_Figure4_core_gene_FeaturePlot_panel.pdf` | 脚本15b生成的结果图。 |
+| `results/figures/15b_Figure4_core_gene_VlnPlot_by_cluster_celltype_panel.pdf` | 脚本15b生成的结果图。 |
+| `results/figures/15b_Figure4_like_scRNA_core_gene_expression_cluster_panel.pdf` | 脚本15b生成的结果图。 |
+| `results/figures/15b_Figure4a_scRNA_celltype_UMAP.pdf` | 脚本15b生成的结果图。 |
+| `results/figures/15b_Figure4a_scRNA_celltype_UMAP.png` | 脚本15b生成的结果图。 |
+| `results/figures/15b_Figure4b_core_gene_DotPlot_by_cluster_celltype.pdf` | 脚本15b生成的结果图。 |
+| `results/figures/16_Figure5_core_gene_high_status_trajectory_panel.pdf` | 脚本16生成的结果图。 |
+| `results/figures/16_Figure5_core_gene_trajectory_expression_panel.pdf` | 脚本16生成的结果图。 |
+| `results/figures/16_Figure5_like_malignant_trajectory_core_gene_panel.pdf` | 脚本16生成的结果图。 |
+| `results/figures/16_Figure5_supplementary_core_gene_pseudotime_or_proxy_trend.pdf` | 脚本16生成的结果图。 |
+| `results/figures/16_Figure5_trajectory_expression_COL1A1.pdf` | 脚本16生成的结果图。 |
+| `results/figures/16_Figure5_trajectory_expression_EMP1.pdf` | 脚本16生成的结果图。 |
+| `results/figures/16_Figure5_trajectory_expression_MYH11.pdf` | 脚本16生成的结果图。 |
+| `results/figures/16_Figure5_trajectory_expression_SASH1.pdf` | 脚本16生成的结果图。 |
+| `results/figures/16_Figure5_trajectory_high_status_COL1A1.pdf` | 脚本16生成的结果图。 |
+| `results/figures/16_Figure5_trajectory_high_status_EMP1.pdf` | 脚本16生成的结果图。 |
+| `results/figures/16_Figure5_trajectory_high_status_MYH11.pdf` | 脚本16生成的结果图。 |
+| `results/figures/16_Figure5_trajectory_high_status_SASH1.pdf` | 脚本16生成的结果图。 |
+| `results/figures/16_Figure5a_trajectory_status.pdf` | 脚本16生成的结果图。 |
+| `results/figures/16_Figure5b_trajectory_celltype.pdf` | 脚本16生成的结果图。 |
+| `results/figures/16_Figure5c_supplementary_pseudotime_or_proxy.pdf` | 脚本16生成的结果图。 |
+
+### results/tables/
+
+生成的表格结果，包括QC统计、表达汇总、空间邻近检验、轨迹metadata和sessionInfo。
+
+| 文件 | 作用 |
+|---|---|
+| `results/tables/01_10x_folder_check.csv` | 脚本01生成的结果表或统计汇总。 |
+| `results/tables/01_core_package_check.csv` | 脚本01生成的结果表或统计汇总。 |
+| `results/tables/01_raw_file_list.csv` | 脚本01生成的结果表或统计汇总。 |
+| `results/tables/01_raw_sample_file_check.csv` | 脚本01生成的结果表或统计汇总。 |
+| `results/tables/02_QC_threshold_suggestions.csv` | 脚本02生成的结果表或统计汇总。 |
+| `results/tables/02_sample_QC_summary.csv` | 脚本02生成的结果表或统计汇总。 |
+| `results/tables/02_sessionInfo.txt` | 脚本02运行时的R环境和包版本记录。 |
+| `results/tables/02_target_gene_check.csv` | 脚本02生成的结果表或统计汇总。 |
+| `results/tables/03_QC_comparison_old03_vs_reproduction_candidate.csv` | 脚本03生成的结果表或统计汇总。 |
+| `results/tables/03_QC_filter_summary_by_sample.csv` | 脚本03生成的结果表或统计汇总。 |
+| `results/tables/03_QC_filter_thresholds_by_sample.csv` | 脚本03生成的结果表或统计汇总。 |
+| `results/tables/03_QC_reproduction_candidate_parameters.csv` | 脚本03生成的结果表或统计汇总。 |
+| `results/tables/03_QC_reproduction_candidate_summary.csv` | 脚本03生成的结果表或统计汇总。 |
+| `results/tables/03_sessionInfo.txt` | 脚本03运行时的R环境和包版本记录。 |
+| `results/tables/04_cluster_by_sample_cell_numbers.csv` | 脚本04生成的结果表或统计汇总。 |
+| `results/tables/04_cluster_summary_resolution_0.2.csv` | 脚本04生成的结果表或统计汇总。 |
+| `results/tables/04_cluster_summary_resolution_0.3.csv` | 脚本04生成的结果表或统计汇总。 |
+| `results/tables/04_cluster_summary_resolution_0.5.csv` | 脚本04生成的结果表或统计汇总。 |
+| `results/tables/04_sessionInfo.txt` | 脚本04运行时的R环境和包版本记录。 |
+| `results/tables/04_variable_features.csv` | 脚本04生成的结果表或统计汇总。 |
+| `results/tables/04_variable_features_2000.csv` | 脚本04生成的结果表或统计汇总。 |
+| `results/tables/05_DotPlot_marker_genes_used.csv` | 脚本05生成的结果表或统计汇总。 |
+| `results/tables/05_all_cluster_markers.csv` | 脚本05生成的结果表或统计汇总。 |
+| `results/tables/05_cluster_preliminary_annotation_template.csv` | 脚本05生成的结果表或统计汇总。 |
+| `results/tables/05_diagnostic_all_markers_resolution_0.2.csv` | 脚本05生成的结果表或统计汇总。 |
+| `results/tables/05_diagnostic_cluster_QC_summary_resolution_0.2.csv` | 脚本05生成的结果表或统计汇总。 |
+| `results/tables/05_diagnostic_cluster_by_sample_resolution_0.2.csv` | 脚本05生成的结果表或统计汇总。 |
+| `results/tables/05_diagnostic_major_lineage_markers_used.csv` | 脚本05生成的结果表或统计汇总。 |
+| `results/tables/05_diagnostic_manual_annotation_template_resolution_0.2.csv` | 脚本05生成的结果表或统计汇总。 |
+| `results/tables/05_diagnostic_sessionInfo.txt` | 脚本05运行时的R环境和包版本记录。 |
+| `results/tables/05_diagnostic_top30_markers_resolution_0.2.csv` | 脚本05生成的结果表或统计汇总。 |
+| `results/tables/05_manual_annotation_table_resolution_0.2.csv` | 脚本05生成的结果表或统计汇总。 |
+| `results/tables/05_marker_panel_gene_check.csv` | 脚本05生成的结果表或统计汇总。 |
+| `results/tables/05_sessionInfo.txt` | 脚本05运行时的R环境和包版本记录。 |
+| `results/tables/05_target_gene_expression_by_cluster.csv` | 脚本05生成的结果表或统计汇总。 |
+| `results/tables/05_target_gene_expression_by_manual_celltype.csv` | 脚本05生成的结果表或统计汇总。 |
+| `results/tables/05_top15_markers_by_cluster.csv` | 脚本05生成的结果表或统计汇总。 |
+| `results/tables/06_diagnostic_gene_check.csv` | 脚本06生成的结果表或统计汇总。 |
+| `results/tables/06_epithelial_cell_level_pseudotime.csv` | 脚本06生成的结果表或统计汇总。 |
+| `results/tables/06_epithelial_cluster_cell_numbers.csv` | 脚本06生成的结果表或统计汇总。 |
+| `results/tables/06_epithelial_cluster_state_scores.csv` | 脚本06生成的结果表或统计汇总。 |
+| `results/tables/06_epithelial_state_marker_genes_used.csv` | 脚本06生成的结果表或统计汇总。 |
+| `results/tables/06_malignant_candidate_by_sample.csv` | 脚本06生成的结果表或统计汇总。 |
+| `results/tables/06_malignant_candidate_cluster_summary.csv` | 脚本06生成的结果表或统计汇总。 |
+| `results/tables/06_pseudotime_root_cluster.csv` | 脚本06生成的结果表或统计汇总。 |
+| `results/tables/06_sessionInfo.txt` | 脚本06运行时的R环境和包版本记录。 |
+| `results/tables/06_target_gene_expression_by_diagnostic_status.csv` | 脚本06生成的结果表或统计汇总。 |
+| `results/tables/06_target_gene_pseudobulk_by_sample.csv` | 脚本06生成的结果表或统计汇总。 |
+| `results/tables/06c_chromosome_aware_CNV_expression_scores.csv` | 脚本06生成的结果表或统计汇总。 |
+| `results/tables/07_CopyKAT_run_summary.csv` | 脚本07生成的结果表或统计汇总。 |
+| `results/tables/07_CopyKAT_tumor_candidate_prediction_by_sample_cluster.csv` | 脚本07生成的结果表或统计汇总。 |
+| `results/tables/07_CopyKAT_tumor_candidate_prediction_overall.csv` | 脚本07生成的结果表或统计汇总。 |
+| `results/tables/07a_cluster6_internal_subcluster_top20_markers.csv` | 脚本07生成的结果表或统计汇总。 |
+| `results/tables/07a_cluster6_shared_state_selected_samples.csv` | 脚本07生成的结果表或统计汇总。 |
+| `results/tables/07a_cluster6_top20_sample_diagnostic_markers.csv` | 脚本07生成的结果表或统计汇总。 |
+| `results/tables/07b_refined_epithelial_malignant_by_sample_cluster.csv` | 脚本07生成的结果表或统计汇总。 |
+| `results/tables/07b_refinement_summary.csv` | 脚本07生成的结果表或统计汇总。 |
+| `results/tables/07c_core_gene_expression_by_sample_and_malignant_state.csv` | 脚本07生成的结果表或统计汇总。 |
+| `results/tables/07c_internal_malignant_state_markers_limited_features.csv` | 脚本07生成的结果表或统计汇总。 |
+| `results/tables/07c_internal_malignant_state_top20_markers.csv` | 脚本07生成的结果表或统计汇总。 |
+| `results/tables/07c_malignant_state_cluster_summary.csv` | 脚本07生成的结果表或统计汇总。 |
+| `results/tables/07c_sessionInfo.txt` | 脚本07运行时的R环境和包版本记录。 |
+| `results/tables/07c_state_gene_sets_available.csv` | 脚本07生成的结果表或统计汇总。 |
+| `results/tables/08_aneuploid_fraction_by_cluster.csv` | 脚本08生成的结果表或统计汇总。 |
+| `results/tables/08_aneuploid_fraction_by_sample_cluster.csv` | 脚本08生成的结果表或统计汇总。 |
+| `results/tables/08_core_gene_expression_by_final_status.csv` | 脚本08生成的结果表或统计汇总。 |
+| `results/tables/08a_epithelial_core_cell_metadata_for_trajectory.csv` | 脚本08生成的结果表或统计汇总。 |
+| `results/tables/08a_epithelial_core_sample_cluster_composition.csv` | 脚本08生成的结果表或统计汇总。 |
+| `results/tables/08a_sessionInfo.txt` | 脚本08运行时的R环境和包版本记录。 |
+| `results/tables/08a_within_sample_trajectory_feasibility_summary.csv` | 脚本08生成的结果表或统计汇总。 |
+| `results/tables/08c_output_file_check.csv` | 脚本08生成的结果表或统计汇总。 |
+| `results/tables/08c_sessionInfo.txt` | 脚本08运行时的R环境和包版本记录。 |
+| `results/tables/09_pseudotime_sample_recommendation.csv` | 脚本09生成的结果表或统计汇总。 |
+| `results/tables/09_strict_malignant_cells_per_sample_summary.csv` | 脚本09生成的结果表或统计汇总。 |
+| `results/tables/10_core_gene_expression_by_sample_cluster_and_program.csv` | 脚本10生成的结果表或统计汇总。 |
+| `results/tables/10_epithelial_core_by_sample_cluster_and_program.csv` | 脚本10生成的结果表或统计汇总。 |
+| `results/tables/10_epithelial_core_relative_program_summary.csv` | 脚本10生成的结果表或统计汇总。 |
+| `results/tables/10_manual_review_cell_summary.csv` | 脚本10生成的结果表或统计汇总。 |
+| `results/tables/10_manual_review_cluster_decision.csv` | 脚本10生成的结果表或统计汇总。 |
+| `results/tables/10_relative_program_gene_sets_available.csv` | 脚本10生成的结果表或统计汇总。 |
+| `results/tables/10_sessionInfo.txt` | 脚本10运行时的R环境和包版本记录。 |
+| `results/tables/11_global_trajectory_cell_metadata.csv` | 脚本11生成的结果表或统计汇总。 |
+| `results/tables/11_global_trajectory_cell_metadata_with_vertex_bins.csv` | 脚本11生成的结果表或统计汇总。 |
+| `results/tables/11_malignant_focused_gene_overlay_summary.csv` | 脚本11生成的结果表或统计汇总。 |
+| `results/tables/11_output_file_check.csv` | 脚本11生成的结果表或统计汇总。 |
+| `results/tables/11_paper_faithful_cell_type_and_malignant_focus_summary.csv` | 脚本11生成的结果表或统计汇总。 |
+| `results/tables/11_paper_style_malignant_focused_gene_overlay_summary.csv` | 脚本11生成的结果表或统计汇总。 |
+| `results/tables/11_paper_style_vertex_bin_cell_type_summary.csv` | 脚本11生成的结果表或统计汇总。 |
+| `results/tables/11_paper_style_vertex_bin_definition.csv` | 脚本11生成的结果表或统计汇总。 |
+| `results/tables/11_principal_graph_edge_coordinates.csv` | 脚本11生成的结果表或统计汇总。 |
+| `results/tables/11_principal_graph_vertex_coordinates.csv` | 脚本11生成的结果表或统计汇总。 |
+| `results/tables/11_sessionInfo.txt` | 脚本11运行时的R环境和包版本记录。 |
+| `results/tables/11_vertex_group_cell_type_summary.csv` | 脚本11生成的结果表或统计汇总。 |
+| `results/tables/11a_candidate_cluster_CopyKAT_support_summary.csv` | 脚本11生成的结果表或统计汇总。 |
+| `results/tables/11a_candidate_cluster_integrated_review_summary.csv` | 脚本11生成的结果表或统计汇总。 |
+| `results/tables/11a_candidate_cluster_sample_composition.csv` | 脚本11生成的结果表或统计汇总。 |
+| `results/tables/11a_candidate_cluster_size_summary.csv` | 脚本11生成的结果表或统计汇总。 |
+| `results/tables/11a_candidate_cluster_vertex_bin_distribution.csv` | 脚本11生成的结果表或统计汇总。 |
+| `results/tables/11a_candidate_malignant_cluster_cell_metadata.csv` | 脚本11生成的结果表或统计汇总。 |
+| `results/tables/11a_sessionInfo.txt` | 脚本11运行时的R环境和包版本记录。 |
+| `results/tables/11b_core_extended_gene_overlay_summary.csv` | 脚本11生成的结果表或统计汇总。 |
+| `results/tables/11b_malignant_focus_definition_summary.csv` | 脚本11生成的结果表或统计汇总。 |
+| `results/tables/11b_monocle3_cell_umap_coordinates_and_focus_labels.csv` | 脚本11生成的结果表或统计汇总。 |
+| `results/tables/11b_output_file_check.csv` | 脚本11生成的结果表或统计汇总。 |
+| `results/tables/11b_principal_graph_edge_coordinates.csv` | 脚本11生成的结果表或统计汇总。 |
+| `results/tables/11b_principal_graph_vertex_coordinates.csv` | 脚本11生成的结果表或统计汇总。 |
+| `results/tables/11b_sessionInfo.txt` | 脚本11运行时的R环境和包版本记录。 |
+| `results/tables/12_SASH1_COL1A1_spot_detection_summary.csv` | 脚本12生成的结果表或统计汇总。 |
+| `results/tables/12_barcode_coordinate_match_summary.csv` | 脚本12生成的结果表或统计汇总。 |
+| `results/tables/12_input_file_inventory.csv` | 脚本12生成的结果表或统计汇总。 |
+| `results/tables/12_output_file_check.csv` | 脚本12生成的结果表或统计汇总。 |
+| `results/tables/12_raw_tissue_positions_table.csv` | 脚本12生成的结果表或统计汇总。 |
+| `results/tables/12_sessionInfo.txt` | 脚本12运行时的R环境和包版本记录。 |
+| `results/tables/12_spatial_spot_QC_cell_metadata.csv` | 脚本12生成的结果表或统计汇总。 |
+| `results/tables/12_spatial_spot_QC_summary.csv` | 脚本12生成的结果表或统计汇总。 |
+| `results/tables/12_spatial_tissue_spot_expression_metadata.csv` | 脚本12生成的结果表或统计汇总。 |
+| `results/tables/13_SASH1_COL1A1_high_colocalization_summary.csv` | 脚本13生成的结果表或统计汇总。 |
+| `results/tables/13_SASH1_COL1A1_high_neighborhood_permutation_summary.csv` | 脚本13生成的结果表或统计汇总。 |
+| `results/tables/13_SASH1_COL1A1_high_thresholds_by_sample.csv` | 脚本13生成的结果表或统计汇总。 |
+| `results/tables/13_output_file_check.csv` | 脚本13生成的结果表或统计汇总。 |
+| `results/tables/13_permutation_distribution_All_spots.csv` | 脚本13生成的结果表或统计汇总。 |
+| `results/tables/13_sessionInfo.txt` | 脚本13运行时的R环境和包版本记录。 |
+| `results/tables/13_spatial_gene_expression_with_coordinates.csv` | 脚本13生成的结果表或统计汇总。 |
+| `results/tables/13_spatial_high_status_metadata.csv` | 脚本13生成的结果表或统计汇总。 |
+| `results/tables/14_cluster_domain_marker_score_summary.csv` | 脚本14生成的结果表或统计汇总。 |
+| `results/tables/14_cluster_paper_style_domain_annotation.csv` | 脚本14生成的结果表或统计汇总。 |
+| `results/tables/14_domain_core_gene_expression_summary.csv` | 脚本14生成的结果表或统计汇总。 |
+| `results/tables/14_domain_marker_genes_found.csv` | 脚本14生成的结果表或统计汇总。 |
+| `results/tables/14_output_file_check.csv` | 脚本14生成的结果表或统计汇总。 |
+| `results/tables/14_possible_spatial_image_files.csv` | 脚本14生成的结果表或统计汇总。 |
+| `results/tables/14_sessionInfo.txt` | 脚本14运行时的R环境和包版本记录。 |
+| `results/tables/14_spatial_domain_and_core_gene_metadata.csv` | 脚本14生成的结果表或统计汇总。 |
+| `results/tables/15_Figure4_cell_metadata_with_core_gene_expression.csv` | 脚本15生成的结果表或统计汇总。 |
+| `results/tables/15_Figure4_celltype_core_gene_expression_summary.csv` | 脚本15生成的结果表或统计汇总。 |
+| `results/tables/15_output_file_check.csv` | 脚本15生成的结果表或统计汇总。 |
+| `results/tables/15_sessionInfo.txt` | 脚本15运行时的R环境和包版本记录。 |
+| `results/tables/15b_Figure4_cell_metadata_with_core_gene_expression.csv` | 脚本15b生成的结果表或统计汇总。 |
+| `results/tables/15b_Figure4_celltype_core_gene_expression_summary.csv` | 脚本15b生成的结果表或统计汇总。 |
+| `results/tables/15b_Figure4_cluster_celltype_core_gene_expression_summary.csv` | 脚本15b生成的结果表或统计汇总。 |
+| `results/tables/15b_output_file_check.csv` | 脚本15b生成的结果表或统计汇总。 |
+| `results/tables/15b_sessionInfo.txt` | 脚本15b运行时的R环境和包版本记录。 |
+| `results/tables/16_Figure5_core_gene_high_thresholds.csv` | 脚本16生成的结果表或统计汇总。 |
+| `results/tables/16_Figure5_gene_high_status_distribution_summary.csv` | 脚本16生成的结果表或统计汇总。 |
+| `results/tables/16_Figure5_status_source_summary.csv` | 脚本16生成的结果表或统计汇总。 |
+| `results/tables/16_Figure5_trajectory_metadata_with_core_gene_expression.csv` | 脚本16生成的结果表或统计汇总。 |
+| `results/tables/16_Figure5_trajectory_status_core_gene_summary.csv` | 脚本16生成的结果表或统计汇总。 |
+| `results/tables/16_available_trajectory_annotation_columns.csv` | 脚本16生成的结果表或统计汇总。 |
+| `results/tables/16_output_file_check.csv` | 脚本16生成的结果表或统计汇总。 |
+| `results/tables/16_sessionInfo.txt` | 脚本16运行时的R环境和包版本记录。 |
+
+### results/objects/
+
+生成的中间对象目录，主要保存Seurat对象、Monocle轨迹对象或大文件分片。
+
+| 文件 | 作用 |
+|---|---|
+| `results/objects/02_raw_before_QC_filtering.rds` | 分析流程生成的Seurat/轨迹中间对象，供后续脚本读取。 |
+| `results/objects/03_QC_reproduction_candidate.rds` | 分析流程生成的Seurat/轨迹中间对象，供后续脚本读取。 |
+| `results/objects/04_standard_Seurat_multi_resolution.rds` | 分析流程生成的Seurat/轨迹中间对象，供后续脚本读取。 |
+| `results/objects/05_diagnostic_manual_annotation_diagnostic.rds` | 分析流程生成的Seurat/轨迹中间对象，供后续脚本读取。 |
+| `results/objects/05_manual_annotated_before_malignant_call.rds` | 分析流程生成的Seurat/轨迹中间对象，供后续脚本读取。 |
+| `results/objects/05_manual_annotated_plot_ready.rds` | 分析流程生成的Seurat/轨迹中间对象，供后续脚本读取。 |
+| `results/objects/06_malignant_candidate_diagnostic.rds` | 分析流程生成的Seurat/轨迹中间对象，供后续脚本读取。 |
+| `results/objects/07_CopyKAT_malignant_call.rds` | 分析流程生成的Seurat/轨迹中间对象，供后续脚本读取。 |
+| `results/objects/08_final_malignant_call.rds` | 分析流程生成的Seurat/轨迹中间对象，供后续脚本读取。 |
+| `results/objects/10_malignant_epithelial_state_characterization.rds` | 分析流程生成的Seurat/轨迹中间对象，供后续脚本读取。 |
+| `results/objects/10_manual_review_epithelial_core.rds` | 分析流程生成的Seurat/轨迹中间对象，供后续脚本读取。 |
+| `results/objects/11_global_trajectory_Seurat.rds.parts/11_global_trajectory_Seurat.rds.part_aa` | 大型RDS对象的分片文件，用于在本地重建完整对象。 |
+| `results/objects/11_global_trajectory_Seurat.rds.parts/11_global_trajectory_Seurat.rds.part_ab` | 大型RDS对象的分片文件，用于在本地重建完整对象。 |
+
+## Git LFS说明
+
+仓库中的大文件使用Git LFS管理。对于特别大的、可重新生成的中间对象，可以先不上传，后续根据需要逐个补充。
