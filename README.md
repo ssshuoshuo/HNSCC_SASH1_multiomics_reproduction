@@ -643,4 +643,4 @@ GSE252265空间转录组原始输入文件目录，用于脚本12–14。
 
 ## Git LFS说明
 
-仓库中的大文件使用Git LFS管理。对于特别大的、可重新生成的中间对象，可以先不上传，后续根据需要逐个补充。
+仓库中的大型输入文件、中间对象和RDS分片由Git LFS管理。12–14的Seurat对象以完整RDS保存；15、15b和16的Seurat对象以分片形式保存，并可通过`scripts_utils/reconstruct_split_rds_objects.sh`重建。
