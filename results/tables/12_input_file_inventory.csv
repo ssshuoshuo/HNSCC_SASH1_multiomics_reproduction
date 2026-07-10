@@ -1,0 +1,6 @@
+"file_name","file_path","file_size_mb"
+"GSE252265_filtered_feature_bc_matrix.h5","/Users/yaoshuo/Desktop/HNSCC_SASH1_reproduction/data/raw/GSE252265/GSE252265_filtered_feature_bc_matrix.h5",68.937
+"GSE252265_aggr_tissue_positions.csv.gz","/Users/yaoshuo/Desktop/HNSCC_SASH1_reproduction/data/raw/GSE252265/GSE252265_aggr_tissue_positions.csv.gz",0.563
+"GSE252265_aggregation.csv.gz","/Users/yaoshuo/Desktop/HNSCC_SASH1_reproduction/data/raw/GSE252265/GSE252265_aggregation.csv.gz",0
+"GSE252265_barcodes.tsv.gz","/Users/yaoshuo/Desktop/HNSCC_SASH1_reproduction/data/raw/GSE252265/GSE252265_barcodes.tsv.gz",0.066
+"GSE252265_features.tsv.gz","/Users/yaoshuo/Desktop/HNSCC_SASH1_reproduction/data/raw/GSE252265/GSE252265_features.tsv.gz",0.318

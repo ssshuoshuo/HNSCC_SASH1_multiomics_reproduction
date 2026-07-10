@@ -1,0 +1,11 @@
+"file","exists"
+"/Users/yaoshuo/Desktop/HNSCC_SASH1_reproduction/results/objects/15b_Figure4_like_scRNA_cluster_core_gene_expression_Seurat.rds",TRUE
+"/Users/yaoshuo/Desktop/HNSCC_SASH1_reproduction/results/tables/15b_Figure4_celltype_core_gene_expression_summary.csv",TRUE
+"/Users/yaoshuo/Desktop/HNSCC_SASH1_reproduction/results/tables/15b_Figure4_cluster_celltype_core_gene_expression_summary.csv",TRUE
+"/Users/yaoshuo/Desktop/HNSCC_SASH1_reproduction/results/tables/15b_Figure4_cell_metadata_with_core_gene_expression.csv",TRUE
+"/Users/yaoshuo/Desktop/HNSCC_SASH1_reproduction/results/figures/15b_Figure4a_scRNA_celltype_UMAP.pdf",TRUE
+"/Users/yaoshuo/Desktop/HNSCC_SASH1_reproduction/results/figures/15b_Figure4_cluster_celltype_UMAP.pdf",TRUE
+"/Users/yaoshuo/Desktop/HNSCC_SASH1_reproduction/results/figures/15b_Figure4b_core_gene_DotPlot_by_cluster_celltype.pdf",TRUE
+"/Users/yaoshuo/Desktop/HNSCC_SASH1_reproduction/results/figures/15b_Figure4_core_gene_FeaturePlot_panel.pdf",TRUE
+"/Users/yaoshuo/Desktop/HNSCC_SASH1_reproduction/results/figures/15b_Figure4_core_gene_VlnPlot_by_cluster_celltype_panel.pdf",TRUE
+"/Users/yaoshuo/Desktop/HNSCC_SASH1_reproduction/results/figures/15b_Figure4_like_scRNA_core_gene_expression_cluster_panel.pdf",TRUE

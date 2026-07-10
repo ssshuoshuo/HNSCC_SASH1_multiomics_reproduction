@@ -1,0 +1,2 @@
+"spatial_sample_id","tissue_spot_number","SASH1_detected_spot_number","COL1A1_detected_spot_number","SASH1_high_spot_number","COL1A1_high_spot_number","SASH1_COL1A1_high_overlap_spot_number","SASH1_high_overlap_COL1A1_high_percent","COL1A1_high_overlap_SASH1_high_percent","expected_overlap_if_independent","observed_to_expected_overlap_ratio"
+"All_spots",11938,3594,10756,899,2689,163,18.13,6.06,202.5,0.8049

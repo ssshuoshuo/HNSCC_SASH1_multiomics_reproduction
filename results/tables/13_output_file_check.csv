@@ -1,0 +1,12 @@
+"file","exists"
+"/Users/yaoshuo/Desktop/HNSCC_SASH1_reproduction/results/objects/13_spatial_SASH1_COL1A1_high_annotated_Seurat.rds",TRUE
+"/Users/yaoshuo/Desktop/HNSCC_SASH1_reproduction/results/tables/13_spatial_gene_expression_with_coordinates.csv",TRUE
+"/Users/yaoshuo/Desktop/HNSCC_SASH1_reproduction/results/tables/13_SASH1_COL1A1_high_thresholds_by_sample.csv",TRUE
+"/Users/yaoshuo/Desktop/HNSCC_SASH1_reproduction/results/tables/13_spatial_high_status_metadata.csv",TRUE
+"/Users/yaoshuo/Desktop/HNSCC_SASH1_reproduction/results/tables/13_SASH1_COL1A1_high_colocalization_summary.csv",TRUE
+"/Users/yaoshuo/Desktop/HNSCC_SASH1_reproduction/results/tables/13_SASH1_high_to_nearest_COL1A1_high_distance_summary.csv",FALSE
+"/Users/yaoshuo/Desktop/HNSCC_SASH1_reproduction/results/tables/13_SASH1_COL1A1_high_neighborhood_permutation_summary.csv",TRUE
+"/Users/yaoshuo/Desktop/HNSCC_SASH1_reproduction/results/figures/13_SASH1_high_COL1A1_high_spatial_overlay.pdf",TRUE
+"/Users/yaoshuo/Desktop/HNSCC_SASH1_reproduction/results/figures/13_core_gene_spatial_expression_panel.pdf",TRUE
+"/Users/yaoshuo/Desktop/HNSCC_SASH1_reproduction/results/figures/13_SASH1_COL1A1_high_colocalization_barplot.pdf",TRUE
+"/Users/yaoshuo/Desktop/HNSCC_SASH1_reproduction/results/figures/13_SASH1_COL1A1_high_neighborhood_permutation_test.pdf",TRUE

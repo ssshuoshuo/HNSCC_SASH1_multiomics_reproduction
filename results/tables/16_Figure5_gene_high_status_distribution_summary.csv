@@ -1,0 +1,21 @@
+"gene","Figure5_status","cell_number","percent_of_gene_high_cells"
+"SASH1","Core malignant focus",132,16.73
+"SASH1","Extended malignant focus",29,3.68
+"SASH1","Candidate malignant-related tumor",10,1.27
+"SASH1","Other tumor/epithelial",67,8.49
+"SASH1","Other non-tumor",551,69.84
+"MYH11","Core malignant focus",163,52.41
+"MYH11","Extended malignant focus",5,1.61
+"MYH11","Candidate malignant-related tumor",9,2.89
+"MYH11","Other tumor/epithelial",12,3.86
+"MYH11","Other non-tumor",122,39.23
+"EMP1","Core malignant focus",502,30.15
+"EMP1","Extended malignant focus",29,1.74
+"EMP1","Candidate malignant-related tumor",123,7.39
+"EMP1","Other tumor/epithelial",186,11.17
+"EMP1","Other non-tumor",825,49.55
+"COL1A1","Core malignant focus",1412,93.88
+"COL1A1","Extended malignant focus",1,0.07
+"COL1A1","Candidate malignant-related tumor",41,2.73
+"COL1A1","Other tumor/epithelial",6,0.4
+"COL1A1","Other non-tumor",44,2.93

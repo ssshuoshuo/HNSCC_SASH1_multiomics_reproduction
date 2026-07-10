@@ -26,3 +26,10 @@ data/raw/GSE252265/
 data/raw/spatial_GSE252265/
 scripts_old_not_uploaded/
 results_old_numbered_duplicates_not_uploaded/
+results_objects_local_not_uploaded/
+results/objects/12_spatial_tissue_spots_Seurat.rds
+results/objects/13_spatial_SASH1_COL1A1_high_annotated_Seurat.rds
+results/objects/14_spatial_domain_annotated_paper_style_Seurat.rds
+results/objects/15_Figure4_like_scRNA_core_gene_expression_Seurat.rds
+results/objects/15b_Figure4_like_scRNA_cluster_core_gene_expression_Seurat.rds
+results/objects/16_Figure5_like_malignant_trajectory_core_gene_Seurat.rds

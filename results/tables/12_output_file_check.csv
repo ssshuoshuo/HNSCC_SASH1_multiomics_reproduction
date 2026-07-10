@@ -1,0 +1,11 @@
+"file","exists"
+"/Users/yaoshuo/Desktop/HNSCC_SASH1_reproduction/results/objects/12_spatial_tissue_spots_Seurat.rds",TRUE
+"/Users/yaoshuo/Desktop/HNSCC_SASH1_reproduction/results/tables/12_input_file_inventory.csv",TRUE
+"/Users/yaoshuo/Desktop/HNSCC_SASH1_reproduction/results/tables/12_raw_tissue_positions_table.csv",TRUE
+"/Users/yaoshuo/Desktop/HNSCC_SASH1_reproduction/results/tables/12_barcode_coordinate_match_summary.csv",TRUE
+"/Users/yaoshuo/Desktop/HNSCC_SASH1_reproduction/results/tables/12_spatial_spot_QC_summary.csv",TRUE
+"/Users/yaoshuo/Desktop/HNSCC_SASH1_reproduction/results/tables/12_SASH1_COL1A1_spot_detection_summary.csv",TRUE
+"/Users/yaoshuo/Desktop/HNSCC_SASH1_reproduction/results/figures/12_spatial_QC_UMI_distribution.pdf",TRUE
+"/Users/yaoshuo/Desktop/HNSCC_SASH1_reproduction/results/figures/12_spatial_QC_detected_gene_distribution.pdf",TRUE
+"/Users/yaoshuo/Desktop/HNSCC_SASH1_reproduction/results/figures/12_spatial_QC_percent_mt_distribution.pdf",TRUE
+"/Users/yaoshuo/Desktop/HNSCC_SASH1_reproduction/results/figures/12_SASH1_COL1A1_EMP1_MYH11_spatial_expression.pdf",TRUE

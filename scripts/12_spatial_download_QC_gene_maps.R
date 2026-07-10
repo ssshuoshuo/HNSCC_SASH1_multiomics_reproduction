@@ -1,39 +1,36 @@
-# ============================================================
-# 12_spatial_download_QC_gene_maps_local.R
-#
-# 目的：
-# 1. 下载GSE252265公开Visium空间转录组数据；
-# 2. 读取聚合后的filtered_feature_bc_matrix.h5；
-# 3. 读取组织spot坐标文件；
-# 4. 检查表达矩阵barcode与空间坐标barcode的匹配情况；
-# 5. 建立不含H&E图像的空间Seurat对象；
-# 6. 完成spot-level QC；
-# 7. 输出SASH1、COL1A1及基础QC指标的空间表达图；
-# 8. 为下一步空间排他性 / 邻近关系分析筛选合格样本。
-#
-# 数据：
+# 12_spatial_download_QC_gene_maps.R
+
+# 本脚本功能：
+# 1. 下载GSE252265公开Visium空间转录组数据
+# 2. 读取聚合后的filtered_feature_bc_matrix.h5
+# 3. 读取组织spot坐标文件
+# 4. 检查表达矩阵barcode与空间坐标barcode的匹配情况
+# 5. 建立不含H&E图像的空间Seurat对象
+# 6. 完成spot-level QC
+# 7. 输出SASH1、COL1A1、EMP1、MYH11及基础QC指标的空间表达图
+# 8. 为下一步空间排他性或邻近关系分析筛选合格样本
+# 9. 保存空间Seurat对象和运行信息
+
+# 本项目专用数据：
 # GSE252265
-# 8例舌癌患者的10x Genomics Visium空间转录组数据。
+# 8例舌癌患者的10x Genomics Visium空间转录组数据
 #
-# 本步骤：
-# - 先确保表达矩阵、spot坐标和样本标签可靠。
-# ============================================================
+# 本步骤先确保表达矩阵、spot坐标和样本标签可靠。
+# 当前聚合坐标文件未提供明确样本列时，本步骤先标记为All_spots。
+#
+# 通用代码修改位置：
+# 1. 换数据集时：
+#    修改raw_dir和download_geo_file中的accession及filename
+#
+# 2. 换目标基因时：
+#    修改target_genes
+#
+# 3. 后续获得可靠切片或样本标签后：
+#    修改spatial_sample_id的赋值逻辑
+
 
 # ============================================================
-# 用户配置说明
-# ============================================================
-# 运行前请检查以下设置：
-# 1. project_dir：项目根目录。
-# 2. raw_dir：原始数据目录。
-# 3. object_dir：RDS对象输出目录。
-# 4. table_dir：CSV和TXT结果输出目录。
-# 5. figure_dir：PDF图输出目录。
-# 6. 输入文件名：若本地文件名不同，请在对应input_file处修改。
-# 7. 线程数、内存和运行位置：CopyKAT、Seurat聚类和Monocle3建议在服务器或高内存本地环境运行。
-# ============================================================
-
-# ============================================================
-# A. 包与路径
+# A. 加载包
 # ============================================================
 
 required_packages <- c(
@@ -64,8 +61,7 @@ if (length(missing_packages) > 0) {
         missing_packages,
         collapse = ", "
       ),
-      "\n\n",
-      "请不要一次性更新全部R包。",
+      "\n\n请不要一次性更新全部R包。",
       "\n将缺少包名称和报错发回。"
     )
   )
@@ -79,6 +75,10 @@ library(dplyr)
 library(tidyr)
 library(ggplot2)
 library(patchwork)
+
+# ============================================================
+# B. 项目路径与文件夹
+# ============================================================
 
 project_dir <- normalizePath(
   "~/Desktop/HNSCC_SASH1_reproduction"
@@ -138,23 +138,7 @@ options(
 )
 
 # ============================================================
-# B. GEO官方FTP固定目录下载文件
-# ============================================================
-#
-# 不再使用：
-# https://www.ncbi.nlm.nih.gov/geo/download/?...
-#
-# 原因：
-# GEO动态下载地址对较大的H5文件可能发生partial transfer。
-#
-# 改用NCBI GEO固定FTP目录：
-# https://ftp.ncbi.nlm.nih.gov/geo/series/
-#
-# 同时：
-# 1. 自动检查已有文件大小；
-# 2. 自动删除过小的残缺文件；
-# 3. 下载到临时文件；
-# 4. 文件大小合格后才正式改名。
+# C. GEO官方FTP固定目录下载函数
 # ============================================================
 
 make_geo_ftp_url <- function(
@@ -198,10 +182,6 @@ download_geo_file <- function(
   minimum_size_bytes <- minimum_size_mb *
     1024^2
   
-  # ----------------------------------------------------------
-  # 检查已有正式文件
-  # ----------------------------------------------------------
-  
   if (file.exists(output_file)) {
     
     existing_size <- file.info(
@@ -244,10 +224,6 @@ download_geo_file <- function(
     )
   }
   
-  # ----------------------------------------------------------
-  # 清理上次中断留下的临时文件
-  # ----------------------------------------------------------
-  
   if (file.exists(temporary_file)) {
     
     message(
@@ -260,10 +236,6 @@ download_geo_file <- function(
       force = TRUE
     )
   }
-  
-  # ----------------------------------------------------------
-  # 从NCBI固定FTP目录下载
-  # ----------------------------------------------------------
   
   download_url <- make_geo_ftp_url(
     accession = accession,
@@ -322,10 +294,6 @@ download_geo_file <- function(
     )
   }
   
-  # ----------------------------------------------------------
-  # 检查下载大小
-  # ----------------------------------------------------------
-  
   if (!file.exists(temporary_file)) {
     stop(
       paste0(
@@ -366,10 +334,6 @@ download_geo_file <- function(
     )
   }
   
-  # ----------------------------------------------------------
-  # 临时文件检查通过后，正式写入项目目录
-  # ----------------------------------------------------------
-  
   renamed_successfully <- file.rename(
     temporary_file,
     output_file
@@ -399,7 +363,7 @@ download_geo_file <- function(
 }
 
 # ============================================================
-# C. 下载GSE252265所需输入文件
+# D. 下载GSE252265所需输入文件
 # ============================================================
 
 spatial_h5_file <- download_geo_file(
@@ -438,7 +402,42 @@ features_file_gz <- download_geo_file(
 )
 
 # ============================================================
-# D. 读取10x H5表达矩阵
+# E. 保存输入文件清单
+# ============================================================
+
+input_file_paths <- c(
+  spatial_h5_file,
+  tissue_positions_file_gz,
+  aggregation_file_gz,
+  barcodes_file_gz,
+  features_file_gz
+)
+
+input_file_inventory <- data.frame(
+  file_name = basename(
+    input_file_paths
+  ),
+  file_path = input_file_paths,
+  file_size_mb = round(
+    file.info(
+      input_file_paths
+    )$size / 1024^2,
+    3
+  ),
+  stringsAsFactors = FALSE
+)
+
+write.csv(
+  input_file_inventory,
+  file.path(
+    table_dir,
+    "12_input_file_inventory.csv"
+  ),
+  row.names = FALSE
+)
+
+# ============================================================
+# F. 读取10x H5表达矩阵
 # ============================================================
 
 raw_expression <- Seurat::Read10X_h5(
@@ -458,15 +457,11 @@ if (is.list(raw_expression)) {
     expression_layer_names
   ) {
     
-    raw_expression <- raw_expression[
-      ["Gene Expression"]
-    ]
+    raw_expression <- raw_expression[["Gene Expression"]]
     
   } else {
     
-    raw_expression <- raw_expression[
-      [1]
-    ]
+    raw_expression <- raw_expression[[1]]
     
     message(
       "H5中未找到Gene Expression层，默认使用第一个层：",
@@ -495,15 +490,7 @@ message(
 )
 
 # ============================================================
-# E. 读取组织spot坐标
-# ============================================================
-#
-# GEO中的tissue positions文件可能：
-# 1. 有标准表头；
-# 2. 无表头；
-# 3. 含有额外sample / library列。
-#
-# 本段自动识别常见格式。
+# G. 读取组织spot坐标
 # ============================================================
 
 read_spatial_positions <- function(
@@ -604,7 +591,7 @@ write.csv(
 )
 
 # ============================================================
-# F. 统一barcode列与坐标列名称
+# H. 统一barcode列与坐标列名称
 # ============================================================
 
 find_column_by_pattern <- function(
@@ -760,13 +747,7 @@ if (!is.na(in_tissue_column)) {
 }
 
 # ============================================================
-# ============================================================
-#
-# 聚合后数据通常可能包含sample、library、orig.ident等列。
-# 若坐标表中有这些信息，则直接保留。
-#
-# 若没有可靠样本列，本步骤不伪造样本标签，
-# 而是标记为All_spots；下一步再依据原始JSON/PNG处理。
+# I. 识别或设置空间样本标签
 # ============================================================
 
 sample_column <- find_column_by_pattern(
@@ -809,7 +790,7 @@ if (!is.na(sample_column)) {
 }
 
 # ============================================================
-# H. barcode匹配与安全检查
+# J. barcode匹配与安全检查
 # ============================================================
 
 expression_barcodes <- colnames(
@@ -873,7 +854,7 @@ if (exact_match_percent < 80) {
 }
 
 # ============================================================
-# I. 建立空间Seurat对象并加入坐标信息
+# K. 建立空间Seurat对象并加入坐标信息
 # ============================================================
 
 spatial_seurat <- CreateSeuratObject(
@@ -930,7 +911,7 @@ spatial_seurat$spatial_sample_id <- spatial_coordinates[
 ]
 
 # ============================================================
-# J. 计算spot-level QC指标
+# L. 计算spot-level QC指标
 # ============================================================
 
 spatial_seurat[["percent.mt"]] <- PercentageFeatureSet(
@@ -1001,12 +982,7 @@ write.csv(
 )
 
 # ============================================================
-# K. 组织spot筛选
-# ============================================================
-#
-# 只在in_tissue == 1的spot上做空间表达图。
-# 不在本步骤设置激进QC过滤阈值，
-# 先保留完整组织区域并输出QC结果供检查。
+# M. 组织spot筛选
 # ============================================================
 
 tissue_spot_barcodes <- rownames(
@@ -1036,7 +1012,7 @@ message(
 )
 
 # ============================================================
-# L. 构建空间绘图数据
+# N. 构建空间绘图数据
 # ============================================================
 
 target_genes <- c(
@@ -1107,7 +1083,7 @@ spatial_plot_data$log10_detected_gene <- log10(
 )
 
 # ============================================================
-# M. 空间绘图函数
+# O. 空间绘图函数
 # ============================================================
 
 make_spatial_feature_plot <- function(
@@ -1121,9 +1097,7 @@ make_spatial_feature_plot <- function(
     aes(
       x = spatial_x,
       y = spatial_y,
-      color = .data[
-        [feature_name]
-      ]
+      color = .data[[feature_name]]
     )
   ) +
     geom_point(
@@ -1134,7 +1108,7 @@ make_spatial_feature_plot <- function(
     coord_equal() +
     facet_wrap(
       ~spatial_sample_id,
-      scales = "free"
+      scales = "fixed"
     ) +
     labs(
       title = plot_title,
@@ -1166,9 +1140,7 @@ make_spatial_qc_plot <- function(
     aes(
       x = spatial_x,
       y = spatial_y,
-      color = .data[
-        [feature_name]
-      ]
+      color = .data[[feature_name]]
     )
   ) +
     geom_point(
@@ -1179,7 +1151,7 @@ make_spatial_qc_plot <- function(
     coord_equal() +
     facet_wrap(
       ~spatial_sample_id,
-      scales = "free"
+      scales = "fixed"
     ) +
     labs(
       title = plot_title,
@@ -1200,21 +1172,21 @@ make_spatial_qc_plot <- function(
 }
 
 # ============================================================
-# N. 输出基础QC空间图
+# P. 输出基础QC空间图
 # ============================================================
 
 p_spatial_umi <- make_spatial_qc_plot(
   plot_data = spatial_plot_data,
   feature_name = "log10_UMI",
   plot_title = "GSE252265 Spatial UMI Distribution",
-  legend_title = "log10(UMI + 1)"
+  legend_title = "log10(UMI+1)"
 )
 
 p_spatial_feature <- make_spatial_qc_plot(
   plot_data = spatial_plot_data,
   feature_name = "log10_detected_gene",
   plot_title = "GSE252265 Spatial Detected Gene Distribution",
-  legend_title = "log10(Detected genes + 1)"
+  legend_title = "log10(Detected genes+1)"
 )
 
 p_spatial_mt <- make_spatial_qc_plot(
@@ -1255,23 +1227,19 @@ ggsave(
 )
 
 # ============================================================
-# O. 输出SASH1 / COL1A1及核心基因空间图
+# Q. 输出SASH1、COL1A1、EMP1、MYH11空间图
 # ============================================================
 
 gene_plot_list <- list()
 
 for (current_gene in target_genes_found) {
   
-  gene_plot_list[
-    [current_gene]
-  ] <- list(
-    make_spatial_feature_plot(
-      plot_data = spatial_plot_data,
-      feature_name = current_gene,
-      plot_title = paste0(
-        current_gene,
-        " Spatial Expression"
-      )
+  gene_plot_list[[current_gene]] <- make_spatial_feature_plot(
+    plot_data = spatial_plot_data,
+    feature_name = current_gene,
+    plot_title = paste0(
+      current_gene,
+      " Spatial Expression"
     )
   )
 }
@@ -1295,11 +1263,7 @@ ggsave(
 )
 
 # ============================================================
-# P. 初步SASH1与COL1A1共同表达审查表
-# ============================================================
-#
-# 注意：
-# 这只是每个spot的表达概览，
+# R. 初步SASH1与COL1A1共同表达审查表
 # ============================================================
 
 spatial_gene_summary <- spatial_plot_data %>%
@@ -1358,7 +1322,7 @@ write.csv(
 )
 
 # ============================================================
-# Q. 保存对象与运行信息
+# S. 保存对象与运行信息
 # ============================================================
 
 saveRDS(
@@ -1381,7 +1345,7 @@ writeLines(
 )
 
 # ============================================================
-# R. 输出检查与完成提示
+# T. 输出检查与完成提示
 # ============================================================
 
 required_output_files <- c(
@@ -1449,7 +1413,7 @@ print(
 )
 
 message("\n============================================================")
-message("09a GSE252265空间转录组下载、QC和核心基因空间图完成。")
+message("12 GSE252265空间转录组下载、QC和核心基因空间图完成。")
 message("")
 message("重点查看：")
 message("1. 12_spatial_spot_QC_summary.csv")
@@ -1458,5 +1422,5 @@ message("3. 12_spatial_QC_UMI_distribution.pdf")
 message("4. 12_SASH1_COL1A1_EMP1_MYH11_spatial_expression.pdf")
 message("")
 message("下一步将根据合格样本，正式进行：")
-message("SASH1与COL1A1-high纤维化区域的空间排他 / 邻近统计分析。")
+message("SASH1与COL1A1-high纤维化区域的空间排他或邻近统计分析。")
 message("============================================================\n")

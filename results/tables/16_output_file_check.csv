@@ -1,0 +1,15 @@
+"file","exists"
+"/Users/yaoshuo/Desktop/HNSCC_SASH1_reproduction/results/objects/16_Figure5_like_malignant_trajectory_core_gene_Seurat.rds",TRUE
+"/Users/yaoshuo/Desktop/HNSCC_SASH1_reproduction/results/tables/16_available_trajectory_annotation_columns.csv",TRUE
+"/Users/yaoshuo/Desktop/HNSCC_SASH1_reproduction/results/tables/16_Figure5_core_gene_high_thresholds.csv",TRUE
+"/Users/yaoshuo/Desktop/HNSCC_SASH1_reproduction/results/tables/16_Figure5_trajectory_metadata_with_core_gene_expression.csv",TRUE
+"/Users/yaoshuo/Desktop/HNSCC_SASH1_reproduction/results/tables/16_Figure5_trajectory_status_core_gene_summary.csv",TRUE
+"/Users/yaoshuo/Desktop/HNSCC_SASH1_reproduction/results/tables/16_Figure5_gene_high_status_distribution_summary.csv",TRUE
+"/Users/yaoshuo/Desktop/HNSCC_SASH1_reproduction/results/tables/16_Figure5_status_source_summary.csv",TRUE
+"/Users/yaoshuo/Desktop/HNSCC_SASH1_reproduction/results/figures/16_Figure5a_trajectory_status.pdf",TRUE
+"/Users/yaoshuo/Desktop/HNSCC_SASH1_reproduction/results/figures/16_Figure5b_trajectory_celltype.pdf",TRUE
+"/Users/yaoshuo/Desktop/HNSCC_SASH1_reproduction/results/figures/16_Figure5c_supplementary_pseudotime_or_proxy.pdf",TRUE
+"/Users/yaoshuo/Desktop/HNSCC_SASH1_reproduction/results/figures/16_Figure5_core_gene_trajectory_expression_panel.pdf",TRUE
+"/Users/yaoshuo/Desktop/HNSCC_SASH1_reproduction/results/figures/16_Figure5_core_gene_high_status_trajectory_panel.pdf",TRUE
+"/Users/yaoshuo/Desktop/HNSCC_SASH1_reproduction/results/figures/16_Figure5_supplementary_core_gene_pseudotime_or_proxy_trend.pdf",TRUE
+"/Users/yaoshuo/Desktop/HNSCC_SASH1_reproduction/results/figures/16_Figure5_like_malignant_trajectory_core_gene_panel.pdf",TRUE
