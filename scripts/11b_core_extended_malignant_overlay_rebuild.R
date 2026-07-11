@@ -39,6 +39,172 @@
 # A. 加载包
 # ============================================================
 
+# ==============================================================================
+# Monocle3依赖检查与可重复安装
+#
+# 目的：
+# 1.仅在缺少Monocle3时安装；
+# 2.固定安装Monocle3 v1.3.1，保持与本项目成功运行版本一致；
+# 3.不使用GitHub API或本机GitHub PAT；
+# 4.不升级已有R包；
+# 5.当Bioconductor主站不稳定时使用Posit镜像。
+#
+# 安装来源：
+# https://codeload.github.com/cole-trapnell-lab/monocle3/zip/refs/tags/v1.3.1
+# ==============================================================================
+
+install_monocle3_v1_3_1_if_missing <- function() {
+  if (requireNamespace("monocle3", quietly = TRUE)) {
+    message(
+      "检测到Monocle3，版本：",
+      as.character(utils::packageVersion("monocle3"))
+    )
+    return(invisible(TRUE))
+  }
+
+  options(timeout = max(1200, getOption("timeout", 60)))
+  options(repos = c(CRAN = "https://cloud.r-project.org"))
+
+  if (!requireNamespace("remotes", quietly = TRUE)) {
+    install.packages("remotes", dependencies = FALSE)
+  }
+
+  cran_dependencies <- c(
+    "assertthat", "digest", "future", "ggrepel", "lme4", "lmtest",
+    "openssl", "pbmcapply", "pheatmap", "pscl", "RhpcBLASctl",
+    "rsample", "slam", "speedglm", "terra", "viridis"
+  )
+
+  missing_cran <- cran_dependencies[
+    !vapply(
+      cran_dependencies,
+      requireNamespace,
+      logical(1),
+      quietly = TRUE
+    )
+  ]
+
+  if (length(missing_cran) > 0) {
+    message("安装缺失CRAN依赖：", paste(missing_cran, collapse = ", "))
+    install.packages(missing_cran, dependencies = TRUE)
+  }
+
+  if (!requireNamespace("grr", quietly = TRUE)) {
+    grr_archive_url <- paste0(
+      "https://cran.r-project.org/src/contrib/Archive/",
+      "grr/grr_0.9.5.tar.gz"
+    )
+    message("从CRAN Archive安装grr 0.9.5")
+    install.packages(
+      grr_archive_url,
+      repos = NULL,
+      type = "source"
+    )
+  }
+
+  if (!requireNamespace("BiocManager", quietly = TRUE)) {
+    install.packages("BiocManager", dependencies = FALSE)
+  }
+
+  options(BioC_mirror = "https://bioconductor.posit.co")
+  options(repos = BiocManager::repositories())
+
+  bioc_dependencies <- c(
+    "Biobase", "SingleCellExperiment", "batchelor", "BiocGenerics",
+    "BiocParallel", "DelayedArray", "DelayedMatrixStats", "HDF5Array",
+    "S4Vectors", "SummarizedExperiment", "limma"
+  )
+
+  missing_bioc <- bioc_dependencies[
+    !vapply(
+      bioc_dependencies,
+      requireNamespace,
+      logical(1),
+      quietly = TRUE
+    )
+  ]
+
+  if (length(missing_bioc) > 0) {
+    message(
+      "安装缺失Bioconductor依赖：",
+      paste(missing_bioc, collapse = ", ")
+    )
+    BiocManager::install(
+      missing_bioc,
+      ask = FALSE,
+      update = FALSE
+    )
+  }
+
+  if (!requireNamespace("batchelor", quietly = TRUE)) {
+    stop("batchelor安装失败，无法继续安装Monocle3。")
+  }
+
+  monocle_zip_url <- paste0(
+    "https://codeload.github.com/",
+    "cole-trapnell-lab/monocle3/",
+    "zip/refs/tags/v1.3.1"
+  )
+
+  monocle_zip_file <- tempfile(
+    pattern = "monocle3_v1_3_1_",
+    fileext = ".zip"
+  )
+  monocle_extract_dir <- tempfile(
+    pattern = "monocle3_v1_3_1_extract_"
+  )
+  dir.create(
+    monocle_extract_dir,
+    recursive = TRUE,
+    showWarnings = FALSE
+  )
+
+  message("下载Monocle3 v1.3.1公开源码。")
+  utils::download.file(
+    url = monocle_zip_url,
+    destfile = monocle_zip_file,
+    mode = "wb",
+    quiet = FALSE
+  )
+
+  utils::unzip(
+    zipfile = monocle_zip_file,
+    exdir = monocle_extract_dir
+  )
+
+  monocle_source_dir <- list.dirs(
+    monocle_extract_dir,
+    recursive = FALSE,
+    full.names = TRUE
+  )
+
+  if (length(monocle_source_dir) != 1L) {
+    stop("无法定位Monocle3 v1.3.1源码目录。")
+  }
+
+  message("安装Monocle3 v1.3.1。")
+  remotes::install_local(
+    path = monocle_source_dir,
+    dependencies = FALSE,
+    upgrade = "never",
+    build = FALSE,
+    quiet = FALSE
+  )
+
+  if (!requireNamespace("monocle3", quietly = TRUE)) {
+    stop("Monocle3 v1.3.1未成功安装。")
+  }
+
+  message(
+    "Monocle3安装验证成功，版本：",
+    as.character(utils::packageVersion("monocle3"))
+  )
+
+  invisible(TRUE)
+}
+
+install_monocle3_v1_3_1_if_missing()
+
 required_packages <- c(
   "Seurat",
   "SeuratObject",
