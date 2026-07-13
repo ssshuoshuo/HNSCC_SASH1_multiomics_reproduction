@@ -1,0 +1,11 @@
+"output","exists"
+"17_scTenifold_KO_OE_summary.csv",TRUE
+"17_scTenifold_KO_OE_all_results.csv",TRUE
+"17_runtime_config.txt",TRUE
+"17_sessionInfo.txt",TRUE
+"17_scTenifold_analysis_input_Seurat.rds",TRUE
+"17_scTenifold_KO_figure_directory",TRUE
+"17_scTenifold_OE_figure_directory",TRUE
+"17_scTenifold_KO_table_directory",TRUE
+"17_scTenifold_OE_table_directory",TRUE
+"17_scTenifold_OE_network_directory",TRUE

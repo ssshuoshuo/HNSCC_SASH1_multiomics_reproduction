@@ -1,0 +1,13 @@
+Input_Seurat: /Users/yaoshuo/Desktop/HNSCC_SASH1_reproduction/results/objects/05_manual_annotated_plot_ready.rds
+Analysis_Mode: malignant_focus
+Selection_Source: cluster_fallback:seurat_clusters:clusters_4_6_11
+Cells_Used: 7353
+Assay_Used: RNA
+Target_Genes: SASH1, COL1A1, EMP1, MYH11
+n_hvg: 2500
+nc_nNet: 5
+nc_nCells: 300
+overexpression_factor: 2
+seed: 123
+scTenifoldKnk_version: 1.1
+scTenifoldNet_version: 1.4

@@ -1,0 +1,9 @@
+"target_gene","perturbation","status","reason","cells_used","genes_used","target_expressing_cells","target_expression_pct","significant_genes"
+"SASH1","KO","Success",NA,7353,2401,922,12.5390996872025,0
+"SASH1","OE","Success",NA,7353,2401,922,12.5390996872025,0
+"COL1A1","KO","Success",NA,7353,2400,2799,38.0660954712362,0
+"COL1A1","OE","Success",NA,7353,2400,2799,38.0660954712362,0
+"EMP1","KO","Success",NA,7353,2401,2520,34.2717258261934,0
+"EMP1","OE","Success",NA,7353,2401,2520,34.2717258261934,0
+"MYH11","KO","Success",NA,7353,2400,386,5.24955800353597,0
+"MYH11","OE","Success",NA,7353,2400,386,5.24955800353597,2

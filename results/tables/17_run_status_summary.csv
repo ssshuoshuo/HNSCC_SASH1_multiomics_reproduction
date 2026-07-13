@@ -1,0 +1,7 @@
+"metric","value"
+"Input_Seurat","/Users/yaoshuo/Desktop/HNSCC_SASH1_reproduction/results/objects/05_manual_annotated_plot_ready.rds"
+"Selection_Source","cluster_fallback:seurat_clusters:clusters_4_6_11"
+"Cells_Used","7353"
+"Successful_Analyses","8"
+"Failed_Analyses","0"
+"Skipped_Analyses","0"
