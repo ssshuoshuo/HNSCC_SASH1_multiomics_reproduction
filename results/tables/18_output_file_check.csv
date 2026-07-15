@@ -1,0 +1,15 @@
+"output","exists"
+"/Users/yaoshuo/Desktop/HNSCC_SASH1_reproduction/results/objects/18_spatial_sample_resolved_HE_Seurat.rds",TRUE
+"/Users/yaoshuo/Desktop/HNSCC_SASH1_reproduction/results/tables/18_gem_id_sample_mapping.csv",TRUE
+"/Users/yaoshuo/Desktop/HNSCC_SASH1_reproduction/results/tables/18_barcode_expression_coordinate_match_summary.csv",TRUE
+"/Users/yaoshuo/Desktop/HNSCC_SASH1_reproduction/results/tables/18_spatial_HE_image_inventory.csv",TRUE
+"/Users/yaoshuo/Desktop/HNSCC_SASH1_reproduction/results/tables/18_spatial_sample_resolved_expression_coordinates.csv",TRUE
+"/Users/yaoshuo/Desktop/HNSCC_SASH1_reproduction/results/tables/18_sample_spot_and_image_coordinate_check.csv",TRUE
+"/Users/yaoshuo/Desktop/HNSCC_SASH1_reproduction/results/tables/18_sample_resolved_core_gene_expression_summary.csv",TRUE
+"/Users/yaoshuo/Desktop/HNSCC_SASH1_reproduction/results/figures/18_spatial_HE/18_all_samples_HE_tissue_spot_overlay_panel.pdf",TRUE
+"/Users/yaoshuo/Desktop/HNSCC_SASH1_reproduction/results/figures/18_spatial_HE/18_all_samples_core_gene_HE_expression_panel.pdf",TRUE
+"/Users/yaoshuo/Desktop/HNSCC_SASH1_reproduction/results/tables/18_sessionInfo.txt",TRUE
+"/Users/yaoshuo/Desktop/HNSCC_SASH1_reproduction/results/figures/18_spatial_HE/18_all_samples_SASH1_HE_expression_panel.pdf",TRUE
+"/Users/yaoshuo/Desktop/HNSCC_SASH1_reproduction/results/figures/18_spatial_HE/18_all_samples_COL1A1_HE_expression_panel.pdf",TRUE
+"/Users/yaoshuo/Desktop/HNSCC_SASH1_reproduction/results/figures/18_spatial_HE/18_all_samples_EMP1_HE_expression_panel.pdf",TRUE
+"/Users/yaoshuo/Desktop/HNSCC_SASH1_reproduction/results/figures/18_spatial_HE/18_all_samples_MYH11_HE_expression_panel.pdf",TRUE
